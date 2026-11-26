@@ -1,4 +1,7 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using StrmAssistant.Core;
 using static StrmAssistant.Mod.PatchManager;
 
 namespace StrmAssistant.Mod
@@ -6,6 +9,8 @@ namespace StrmAssistant.Mod
     public abstract class PatchBase<T> where T : PatchBase<T>
     {
         public PatchTracker PatchTracker;
+
+        private readonly List<TargetResolution> _requiredTargets = new List<TargetResolution>();
 
         public static T Instance { get; private set; }
 
@@ -15,6 +20,16 @@ namespace StrmAssistant.Mod
             PatchTracker = new PatchTracker(typeof(T), PatchApproach.Harmony);
         }
 
+        /// <summary>
+        /// 登记一个必需目标。OnInitialize 结束后统一校验；缺失时模块进入 NotSupported，
+        /// 不再出现「GetType 返回 null → 空引用」的崩溃式失败。
+        /// </summary>
+        protected TargetResolution Require(TargetResolution resolution)
+        {
+            if (resolution != null) _requiredTargets.Add(resolution);
+            return resolution;
+        }
+
         protected void Initialize()
         {
             PatchTracker.Status = PatchStatus.Initializing;
@@ -22,6 +37,14 @@ namespace StrmAssistant.Mod
             try
             {
                 OnInitialize();
+                ApplyTargetRequirements();
+
+                if (PatchTracker.Status == PatchStatus.NotSupported)
+                {
+                    PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                    return;
+                }
+
                 PatchTracker.Status = PatchStatus.Initialized;
                 PatchTracker.InitializedAt = DateTime.Now;
 
@@ -63,12 +86,42 @@ namespace StrmAssistant.Mod
             }
         }
 
+        private void ApplyTargetRequirements()
+        {
+            var missing = _requiredTargets.Where(t => t != null && !t.IsFound).ToList();
+            if (missing.Count == 0) return;
+
+            foreach (var target in missing)
+            {
+                PatchTracker.MissingTargets.Add(target.Description);
+                PatchTracker.AddError($"target not found: {target}");
+                Plugin.Instance.Logger.Warn(
+                    $"[{PatchTracker.PatchType.Name}] target not found: {target.Description} ({target.FailureReason})");
+            }
+
+            PatchTracker.FallbackPatchApproach = PatchApproach.None;
+            PatchTracker.Status = PatchStatus.NotSupported;
+        }
+
         protected abstract void OnInitialize();
 
         protected abstract void Prepare(bool apply);
 
         public void Patch()
         {
+            if (PatchTracker.FallbackPatchApproach == PatchApproach.None || PatchTracker.MissingTargets.Count > 0)
+            {
+                PatchTracker.Status = PatchStatus.NotSupported;
+
+                if (Plugin.Instance.DebugMode)
+                {
+                    Plugin.Instance.Logger.Debug(
+                        $"[{PatchTracker.PatchType.Name}] Patch() skipped - unsupported on this Emby build");
+                }
+
+                return;
+            }
+
             // ★ 统一 debug 日志：模块 Patch 应用前
             if (Plugin.Instance.DebugMode)
             {
@@ -78,7 +131,7 @@ namespace StrmAssistant.Mod
             var hadErrors = PatchTracker.HasErrors;
 
             Prepare(true);
-            PatchTracker.Status = PatchStatus.Applied;
+            PatchTracker.Status = PatchTracker.HasErrors ? PatchStatus.Failed : PatchStatus.Applied;
 
             // Prepare 是 void，模块无法回报「某条补丁其实没打上」；PatchUnpatch 失败会记进
             // PatchTracker.AddError，这里据此补一条告警，避免状态页显示 Applied 而功能实际缺失。
@@ -91,7 +144,7 @@ namespace StrmAssistant.Mod
             // ★ 统一 debug 日志：模块 Patch 应用后
             if (Plugin.Instance.DebugMode)
             {
-                Plugin.Instance.Logger.Debug($"[{PatchTracker.PatchType.Name}] ✓ Patch() applied - Status={PatchTracker.Status}");
+                Plugin.Instance.Logger.Debug($"[{PatchTracker.PatchType.Name}] Patch() finished - Status={PatchTracker.Status}, Healthy={PatchTracker.IsHealthy}");
             }
         }
 

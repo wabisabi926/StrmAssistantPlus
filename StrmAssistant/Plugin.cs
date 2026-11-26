@@ -99,6 +99,7 @@ namespace StrmAssistant
         public readonly ILogger Logger;
         public readonly IApplicationHost ApplicationHost;
         public readonly IApplicationPaths ApplicationPaths;
+        public readonly IImageExtractionManager ImageExtractionManager;
 
         private readonly ILibraryManager _libraryManager;
         private readonly IUserManager _userManager;
@@ -124,6 +125,7 @@ namespace StrmAssistant
             Logger.Info("Plugin is getting loaded.");
             ApplicationHost = applicationHost;
             ApplicationPaths = applicationPaths;
+            ImageExtractionManager = imageExtractionManager;
 
             if (ApplicationHost.ApplicationVersion < new Version(MinRequiredEmbyVersion))
             {
@@ -1033,7 +1035,7 @@ namespace StrmAssistant
         /// <summary>
         /// 品牌区「Emby Server_vx.x.x.x +」对外展示的基准版本（与准入检查解耦）。
         /// </summary>
-        public const string AdvertisedEmbyVersion = "4.10.2.0";
+        public const string AdvertisedEmbyVersion = "4.11.0.19";
 
         public sealed override string Name => "StrmAssistantPlus";
 

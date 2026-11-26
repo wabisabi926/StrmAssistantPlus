@@ -268,7 +268,7 @@ namespace StrmAssistant.Core
             {
                 var patches = Mod.PatchManager.PatchTrackerList;
                 var failedCorePatches = patches
-                    .Where(p => p.IsCoreFeature && p.IsSupported && !p.IsRunning)
+                    .Where(p => Mod.PatchManager.IsCoreFeature(p) && p.IsFeatureEnabled && !p.IsHealthy)
                     .ToList();
                 
                 if (failedCorePatches.Any())
@@ -285,7 +285,7 @@ namespace StrmAssistant.Core
                 }
                 
                 var reflectionPatches = patches
-                    .Where(p => p.IsRunning && p.FallbackPatchApproach == Mod.PatchApproach.Reflection)
+                    .Where(p => p.IsHealthy && p.FallbackPatchApproach == Mod.PatchApproach.Reflection)
                     .ToList();
                 
                 if (reflectionPatches.Count > patches.Count / 2)

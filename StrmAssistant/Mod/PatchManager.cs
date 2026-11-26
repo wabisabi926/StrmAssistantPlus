@@ -61,6 +61,28 @@ namespace StrmAssistant.Mod
         public static ServerSideVersionLabel ServerSideVersionLabel;
         public static ReverseLogLines ReverseLogLines;
 
+        private static readonly HashSet<Type> OptionalFeatureTypes = new HashSet<Type>
+        {
+            typeof(EnhanceChineseSearch),
+            typeof(PreferOriginalPoster),
+            typeof(ChineseTvdb),
+            typeof(NoBoxsetsAutoCreation),
+            typeof(EnableImageCapture),
+            typeof(AltMovieDbConfig),
+            typeof(ChineseMovieDb),
+            typeof(EnhanceMovieDbPerson),
+            typeof(EnhanceNfoMetadata),
+            typeof(MovieDbEpisodeGroup),
+            typeof(OptimizeMovieDbEpisodeScraping),
+            typeof(StrmDirectRedirect),
+            typeof(LiveTvDirectRedirect),
+            typeof(LibraryScopePlayProgress),
+            typeof(ServerSideVersionLabel)
+        };
+
+        public static bool IsCoreFeature(PatchTracker tracker) =>
+            tracker != null && !OptionalFeatureTypes.Contains(tracker.PatchType);
+
         private static readonly ConcurrentDictionary<Tuple<Type, string>, HarmonyMethod> HarmonyMethodCache 
             = new ConcurrentDictionary<Tuple<Type, string>, HarmonyMethod>();
         private static readonly ConcurrentDictionary<Tuple<Type, string>, MethodInfo> MethodInfoCache 
@@ -144,9 +166,10 @@ namespace StrmAssistant.Mod
                 {
                     var approach = tracker.FallbackPatchApproach;
                     var status = tracker.Status;
-                    var mark = status == PatchStatus.Applied || status == PatchStatus.Initialized ? "✓" : "✗";
+                    var mark = !tracker.IsFeatureEnabled ? "-" : tracker.IsHealthy ? "✓" : "✗";
                     Plugin.Instance.Logger.Info(
-                        $"  {mark} {tracker.PatchType.Name,-28} Status={status,-12} Approach={approach}");
+                        $"  {mark} {tracker.PatchType.Name,-28} Status={status,-12} Approach={approach}" +
+                        (tracker.HasErrors ? $" Errors={tracker.ErrorMessages.Count}" : string.Empty));
                 }
                 Plugin.Instance.Logger.Info($"==================================================================");
 
@@ -203,40 +226,23 @@ namespace StrmAssistant.Mod
         public static bool IsModSuccess()
         {
             var supportedPatches = PatchTrackerList.Where(p => p.IsSupported).ToList();
+
+            // 只对用户启用的功能做健康判定；关闭的功能显示 Skipped，不再制造假 Degraded。
+            var enabledPatches = supportedPatches.Where(p => p.IsFeatureEnabled).ToList();
+            var disabledPatches = supportedPatches.Where(p => !p.IsFeatureEnabled).ToList();
             
-            // 定义可选功能补丁（这些功能不可用时不应该影响整体状态）
-            var optionalFeatureTypes = new[]
-            {
-                typeof(EnhanceChineseSearch),
-                typeof(PreferOriginalPoster),
-                typeof(ChineseTvdb),
-                typeof(NoBoxsetsAutoCreation),
-                typeof(EnableImageCapture),
-                typeof(AltMovieDbConfig),
-                typeof(ChineseMovieDb),
-                typeof(EnhanceMovieDbPerson),
-                typeof(EnhanceNfoMetadata),
-                typeof(MovieDbEpisodeGroup),
-                typeof(OptimizeMovieDbEpisodeScraping),
-                typeof(StrmDirectRedirect),
-                typeof(LiveTvDirectRedirect),
-                typeof(LibraryScopePlayProgress),
-                typeof(ServerSideVersionLabel)
-            };
-            
-            // 核心功能补丁（这些失败会影响整体状态）
-            var corePatches = supportedPatches.Where(p => !optionalFeatureTypes.Contains(p.PatchType)).ToList();
-            // 可选功能补丁
-            var optionalPatches = supportedPatches.Where(p => optionalFeatureTypes.Contains(p.PatchType)).ToList();
-            
-            // 只有真正失败的补丁（FallbackPatchApproach为None）才认为是失败
-            // Reflection回退是完全正常和可接受的，功能仍然可用
-            var failedCorePatches = corePatches.Where(p => p.FallbackPatchApproach == PatchApproach.None).ToList();
-            var failedOptionalPatches = optionalPatches.Where(p => p.FallbackPatchApproach == PatchApproach.None).ToList();
-            
-            // 使用Reflection的补丁（即使默认是Harmony）也应该被视为成功
-            var reflectionPatches = supportedPatches.Where(p => 
-                p.DefaultPatchApproach == PatchApproach.Harmony && 
+            // 核心功能失败影响整体健康；可选功能失败单独展示，不冒充“全部正常”。
+            var corePatches = enabledPatches.Where(IsCoreFeature).ToList();
+            var optionalPatches = enabledPatches.Where(p => !IsCoreFeature(p)).ToList();
+
+            // Reflection 回退本身不是失败；只有目标缺失、补丁错误或 Fallback=None 才不健康。
+            var failedCorePatches = corePatches.Where(p => !p.IsHealthy).ToList();
+            var failedOptionalPatches = optionalPatches.Where(p => !p.IsHealthy).ToList();
+
+            // 使用Reflection且无错误的补丁才可标记为正常回退。
+            var reflectionPatches = enabledPatches.Where(p =>
+                p.IsHealthy &&
+                p.DefaultPatchApproach == PatchApproach.Harmony &&
                 p.FallbackPatchApproach == PatchApproach.Reflection).ToList();
             
             // 构建状态字符串用于比较，避免重复日志
@@ -245,13 +251,20 @@ namespace StrmAssistant.Mod
                 : failedOptionalPatches.Any()
                     ? $"OptionalFailed:{failedOptionalPatches.Count}/{optionalPatches.Count}"
                     : reflectionPatches.Any()
-                        ? $"Reflection:{reflectionPatches.Count}/{supportedPatches.Count}"
+                        ? $"Reflection:{reflectionPatches.Count}/{enabledPatches.Count}"
                         : "AllSuccess";
+            statusLog += $";Skipped:{disabledPatches.Count}";
             
             // 只在状态改变或首次调用时记录日志
             if (_lastStatusLog != statusLog)
             {
                 _lastStatusLog = statusLog;
+
+                if (disabledPatches.Any())
+                {
+                    Plugin.Instance.Logger.Info(
+                        $"Harmony Mod: {disabledPatches.Count} feature(s) skipped (disabled by options)");
+                }
                 
                 if (failedCorePatches.Any())
                 {
@@ -259,7 +272,10 @@ namespace StrmAssistant.Mod
                     
                     foreach (var patch in failedCorePatches)
                     {
-                        Plugin.Instance.Logger.Error($"  ✗ {patch.PatchType.Name} - Core feature disabled (required method/plugin not found)");
+                        var reason = patch.MissingTargets.FirstOrDefault();
+                        Plugin.Instance.Logger.Error(
+                            $"  ✗ {patch.PatchType.Name} - Core feature disabled" +
+                            (string.IsNullOrEmpty(reason) ? string.Empty : $" - {reason}"));
                     }
                     
                     Plugin.Instance.Logger.Error($"Some core features are not available. Plugin may not function correctly.");
@@ -272,7 +288,10 @@ namespace StrmAssistant.Mod
                     {
                         foreach (var patch in failedOptionalPatches)
                         {
-                            Plugin.Instance.Logger.Debug($"  - {patch.PatchType.Name} - Optional feature disabled (plugin/dependency not installed)");
+                            var reason = patch.MissingTargets.FirstOrDefault();
+                            Plugin.Instance.Logger.Debug(
+                                $"  - {patch.PatchType.Name} - Optional feature disabled" +
+                                (string.IsNullOrEmpty(reason) ? string.Empty : $" - {reason}"));
                         }
                     }
                     
@@ -290,13 +309,13 @@ namespace StrmAssistant.Mod
                     }
                     Plugin.Instance.Logger.Info("All features are available and working correctly.");
                 }
-                else if (supportedPatches.Any())
+                else if (enabledPatches.Any())
                 {
-                    Plugin.Instance.Logger.Info($"Harmony Mod: All {supportedPatches.Count} patches initialized successfully");
+                    Plugin.Instance.Logger.Info($"Harmony Mod: All {enabledPatches.Count} enabled patches initialized successfully");
                 }
             }
             
-            // 只有核心功能失败时才返回false
+            // 只有启用的核心功能失败时才返回false
             // 可选功能失败和Reflection回退都不应该被视为失败
             var result = failedCorePatches.Count == 0;
             _lastModSuccessStatus = result;
@@ -694,17 +713,20 @@ namespace StrmAssistant.Mod
             report.AppendLine($"Total Patches: {PatchTrackerList.Count}");
             report.AppendLine();
             
-            var runningPatches = PatchTrackerList.Where(p => p.IsRunning).ToList();
-            var failedPatches = PatchTrackerList.Where(p => !p.IsRunning && p.IsSupported).ToList();
-            
-            report.AppendLine($"Running Patches: {runningPatches.Count}");
-            foreach (var patch in runningPatches.OrderBy(p => p.PatchType.Name))
+            var healthyPatches = PatchTrackerList.Where(p => p.IsHealthy).ToList();
+            var failedPatches = PatchTrackerList.Where(p => p.IsSupported && !p.IsHealthy).ToList();
+            var skippedPatches = PatchTrackerList.Where(p => !p.IsFeatureEnabled).ToList();
+
+            report.AppendLine($"Healthy Patches: {healthyPatches.Count}");
+            foreach (var patch in healthyPatches.OrderBy(p => p.PatchType.Name))
             {
-                var method = patch.FallbackPatchApproach == patch.DefaultPatchApproach 
-                    ? patch.FallbackPatchApproach.ToString() 
+                var method = patch.FallbackPatchApproach == patch.DefaultPatchApproach
+                    ? patch.FallbackPatchApproach.ToString()
                     : $"{patch.DefaultPatchApproach} → {patch.FallbackPatchApproach}";
                 report.AppendLine($"  ✓ {patch.PatchType.Name}: {method}");
             }
+
+            report.AppendLine($"Skipped Patches: {skippedPatches.Count}");
             
             if (failedPatches.Any())
             {

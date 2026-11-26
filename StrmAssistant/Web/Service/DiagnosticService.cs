@@ -20,7 +20,10 @@ namespace StrmAssistant.Web.Service
             public int Total { get; set; }
             public int Supported { get; set; }
             public int Running { get; set; }
+            public int Healthy { get; set; }
             public int Failed { get; set; }
+            public int Skipped { get; set; }
+            public int WithErrors { get; set; }
             public int Unsupported { get; set; }
         }
 
@@ -38,8 +41,11 @@ namespace StrmAssistant.Web.Service
         {
             public string Name { get; set; }
             public bool IsSupported { get; set; }
+            public bool IsFeatureEnabled { get; set; }
             public bool IsRunning { get; set; }
+            public bool IsHealthy { get; set; }
             public bool IsCoreFeature { get; set; }
+            public string Status { get; set; }
             public string Approach { get; set; }
             public bool HasErrors { get; set; }
             public List<string> Errors { get; set; }
@@ -124,8 +130,11 @@ namespace StrmAssistant.Web.Service
                     {
                         Name = p.PatchType.Name,
                         IsSupported = p.IsSupported,
+                        IsFeatureEnabled = p.IsFeatureEnabled,
                         IsRunning = p.IsRunning,
-                        IsCoreFeature = p.IsCoreFeature,
+                        IsHealthy = p.IsHealthy,
+                        IsCoreFeature = PatchManager.IsCoreFeature(p),
+                        Status = p.Status.ToString(),
                         Approach = p.FallbackPatchApproach == p.DefaultPatchApproach
                             ? p.DefaultPatchApproach.ToString()
                             : $"{p.DefaultPatchApproach} -> {p.FallbackPatchApproach}",
@@ -156,7 +165,10 @@ namespace StrmAssistant.Web.Service
                 Total = list.Count,
                 Supported = supported.Count,
                 Running = supported.Count(p => p.IsRunning),
-                Failed = supported.Count(p => !p.IsRunning),
+                Healthy = supported.Count(p => p.IsHealthy),
+                Failed = supported.Count(p => !p.IsHealthy),
+                Skipped = supported.Count(p => !p.IsFeatureEnabled),
+                WithErrors = supported.Count(p => p.HasErrors),
                 Unsupported = list.Count(p => !p.IsSupported)
             };
         }

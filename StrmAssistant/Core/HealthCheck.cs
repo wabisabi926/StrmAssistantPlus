@@ -153,24 +153,14 @@ namespace StrmAssistant.Core
         {
             try
             {
-                var supportedPatches = PatchManager.PatchTrackerList.Where(p => p.IsSupported).ToList();
-                var runningPatches = supportedPatches.Where(p => p.IsRunning).ToList();
-                
-                if (runningPatches.Count == 0 && supportedPatches.Count > 0)
+                // 与 PatchManager 的判定保持一致：只统计用户启用的功能；
+                // 未启用的模块显示 Skipped，不参与 Degraded。
+                if (!PatchManager.PatchTrackerList.Any(p => p.IsSupported))
                 {
-                    return HealthStatus.Unhealthy;
+                    return HealthStatus.Healthy;
                 }
-                
-                var failedCorePatches = supportedPatches
-                    .Where(p => p.IsCoreFeature && !p.IsRunning)
-                    .ToList();
-                
-                if (failedCorePatches.Any())
-                {
-                    return HealthStatus.Degraded;
-                }
-                
-                return HealthStatus.Healthy;
+
+                return PatchManager.IsModSuccess() ? HealthStatus.Healthy : HealthStatus.Degraded;
             }
             catch
             {

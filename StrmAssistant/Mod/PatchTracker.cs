@@ -64,6 +64,16 @@ namespace StrmAssistant.Mod
         public PatchApproach FallbackPatchApproach { get; set; }
 
         public bool IsSupported { get; set; } = true;
+
+        /// <summary>
+        /// 用户是否启用了该功能。未启用的模块不参与健康检查，也不应显示为失败。
+        /// </summary>
+        public bool IsFeatureEnabled { get; set; } = true;
+
+        /// <summary>
+        /// 未解析到的目标（assembly/type/method/signature）。为空表示目标已全部就绪。
+        /// </summary>
+        public List<string> MissingTargets { get; } = new List<string>();
         
         /// <summary>
         /// 补丁状态
@@ -118,6 +128,17 @@ namespace StrmAssistant.Mod
         /// 是否成功运行（使用Harmony或Reflection）
         /// </summary>
         public bool IsRunning => FallbackPatchApproach != PatchApproach.None;
+
+        /// <summary>
+        /// 补丁是否真实健康。已应用的重载可能失败并回退 Reflection，不能仅凭 IsRunning 判定成功。
+        /// </summary>
+        public bool IsHealthy =>
+            IsSupported &&
+            FallbackPatchApproach != PatchApproach.None &&
+            MissingTargets.Count == 0 &&
+            !HasErrors &&
+            Status != PatchStatus.Failed &&
+            Status != PatchStatus.NotSupported;
         
         /// <summary>
         /// 获取状态摘要
