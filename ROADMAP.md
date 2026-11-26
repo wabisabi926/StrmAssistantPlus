@@ -8,17 +8,17 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 698/698 通过；Release 构建 0 警告 0 错误。
+- 单测 704/704 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
 - 关闭功能 smoke：MergeMultiVersion、ServerSideVersionLabel、CustomLocalDiscovery（4.10/4.11）、深度删除自定义通知通过。
 - 4.11 通知保留原生分组与插件自定义通知；剧集摘要注入确认为不可靠，已跳过相关钩子。4.10 完整通知补丁可用。
 - 明确限制：4.11 不挂批量 DTO、不 patch `SaveChapters`；ExclusiveExtract 保持受限模式并关闭；插件指纹使用原生检测。
-- `UnlockIntroSkip` STRM 修复通过：两集均被原生任务选中，MarkerDetector 返回 `supported=True`。
-- 测试 Webhook、临时库和 smoke 媒体已清理；STRM 验收目录与反编译文件已按用户确认删除。4.10 无效 `simple.dll` 与历史 DLL 备份已删除；未保留 Emby 或插件备份。
-- 4.11 适配源码已提交到本地 `main`；发布前安全修复已完成，待提交/推送、升版本号、打 tag 和发版，均需用户确认。
-- 运行时验收：同一最终 DLL（SHA-256 `ea24a80a…`）已部署到 4.11.0.19 与 4.10.2.0，两套启动日志均为 Healthy；六个设置页签已逐页打开，失败横幅已消除，品牌行钻石图标与“播放探测”标题已在本机两套页面确认。
+- `UnlockIntroSkip` STRM 修复通过：真实片头样本两集均被原生任务选中；合成片尾样本的普通 MP4、本地 STRM 与本机 Range STRM 均写入 `CreditsStart` 标记。
+- 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例与 Range 服务均已清理；4.10 无效 `simple.dll` 与历史 DLL 备份已删除；本轮临时回滚副本已删除。
+- 4.11 适配与发布前安全修复已递交推送；STRM 片尾修复与文档待递交，升版本号、打 tag 和发版均需用户确认。
+- 运行时验收：最终 DLL（SHA-256 `0ed50e81…`）已部署到 4.11.0.19 与 4.10.2.0，两套启动日志均为 Healthy；4.10 临时开启 `UnlockIntroSkip` 时为 `Applied`，验后已恢复关闭。上一批六个设置页签与品牌行验收仍有效。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
@@ -167,9 +167,13 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
   两端最终 `47.28 / 3.58`，见文首完成记录。
 - 远程采样预算自适应（弱网降到 32MB/128 段），需真机弱网验证。
 
-### 5. 真实 STRM 原生片头/片尾内容验收（部分完成）
+### 5. STRM 原生片头/片尾内容验收（部分完成）
 
-本机 4.11 使用《武林外传》S01E01/E02 两个真实 STRM：片头任务完成，两集均生成音频指纹并识别出同一段约 97.3 秒片头，置信度 0.9；片尾任务在远程 STRM 的快速 Seek 阶段失败，重试无候选，需进一步区分 Emby 原生 ffmpeg 参数与远程 Range 服务限制。
+- 本机 4.11 使用《武林外传》S01E01/E02 两个真实 STRM：片头任务完成，两集均生成音频指纹并识别出同一段约 97.3 秒片头，置信度 0.9。
+- 片尾任务已补齐 `CreditsScheduledTask` 查询范围与 `MarkerDetector.IsCreditsDetectionEnabled` 的 STRM 放行；启用时仍遵守媒体库的片尾检测开关。
+- 隔离 `CreditLab` 真机验收：普通 MP4、本地 STRM、两条本机 HTTP Range STRM 均完成原生分析并写入 `CreditsStart=52:00`；最终 DLL SHA-256 `0ed50e81…`，启动 `Healthy`、`UnlockIntroSkip=Applied`。
+- 合成样本为 60 分钟视频，最后 8 分钟含黑底高亮与字幕变化，用于满足原生黑帧、上下文和稳定性阈值；该证据验证 STRM 链路，不替代真实影片内容验收。
+- 真实 NAS 源片尾内容仍待家庭局域网恢复后复验；本轮不访问 NAS。
 
 ### 6. 真实多 m2ts 本地 ISO
 

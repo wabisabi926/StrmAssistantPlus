@@ -5,6 +5,8 @@ using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Entities;
 using StrmAssistant.Common;
 using StrmAssistant.Core;
+using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -19,8 +21,45 @@ namespace StrmAssistant.Mod
         private static MethodInfo _createQueryForEpisodeIntroDetection;
         private static MethodInfo _onFailedToFindIntro;
         private static MethodInfo _detectSequences;
+        private static MethodInfo _createQueryForCreditsDetection;
+        private static MethodInfo _isCreditsDetectionEnabled;
+        private static PropertyInfo _enableCreditsDetection;
 
         private static readonly AsyncLocal<bool> LogZeroConfidence = new AsyncLocal<bool>();
+
+        internal static bool ShouldForceDetectionSupport(Video item)
+        {
+            return item != null && item.IsShortcut;
+        }
+
+        internal static bool ShouldForceCreditsDetectionSupport(Video item, bool creditsDetectionEnabled)
+        {
+            return creditsDetectionEnabled && ShouldForceDetectionSupport(item);
+        }
+
+        internal static void ApplyDetectionScope(InternalItemsQuery query, IEnumerable<string> libraryPaths,
+            IEnumerable<long> blacklistSeasons, bool favoritesOnly, IEnumerable<long> favoriteSeasons)
+        {
+            if (favoritesOnly)
+            {
+                query.PathStartsWithAny = Array.Empty<string>();
+                query.ParentIds = favoriteSeasons.DefaultIfEmpty(-1).ToArray();
+            }
+            else
+            {
+                var paths = libraryPaths.ToArray();
+                if (paths.Length > 0)
+                {
+                    query.PathStartsWithAny = paths;
+                }
+
+                var blacklist = blacklistSeasons.ToArray();
+                if (blacklist.Length > 0)
+                {
+                    query.ExcludeParentIds = blacklist;
+                }
+            }
+        }
 
         public UnlockIntroSkip()
         {
@@ -49,6 +88,15 @@ namespace StrmAssistant.Mod
                 var markerDetector = embyProviders.GetType("Emby.Providers.Markers.MarkerDetector");
                 _isMarkerDetectionSupported = Require(EmbyTargetResolver.ResolveByName(markerDetector,
                     "IsMarkerDetectionSupported", new[] { typeof(Video) }, typeof(bool), true)).Method;
+                _isCreditsDetectionEnabled = Require(EmbyTargetResolver.ResolveByName(markerDetector,
+                    "IsCreditsDetectionEnabled", new[] { typeof(Video), typeof(LibraryOptions) }, typeof(bool), false)).Method;
+                _enableCreditsDetection = typeof(LibraryOptions).GetProperty("EnableCreditsDetection")
+                    ?? throw new MissingMethodException("LibraryOptions.EnableCreditsDetection");
+
+                var creditsScheduledTask = embyProviders.GetType("Emby.Providers.Markers.CreditsScheduledTask");
+                _createQueryForCreditsDetection = Require(EmbyTargetResolver.ResolveByName(creditsScheduledTask,
+                    "CreateQueryForCreditsDetection", Type.EmptyTypes,
+                    typeof(InternalItemsQuery), true)).Method;
                 return;
             }
 
@@ -84,6 +132,19 @@ namespace StrmAssistant.Mod
             PatchUnpatch(PatchTracker, apply, _createQueryForEpisodeIntroDetection,
                 postfix: nameof(CreateQueryForEpisodeIntroDetectionPostfix));
 
+            if (_isCreditsDetectionEnabled != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _isCreditsDetectionEnabled,
+                    prefix: nameof(IsCreditsDetectionEnabledPrefix),
+                    postfix: nameof(IsCreditsDetectionEnabledPostfix));
+            }
+
+            if (_createQueryForCreditsDetection != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _createQueryForCreditsDetection,
+                    postfix: nameof(CreateQueryForCreditsDetectionPostfix));
+            }
+
             if (_detectSequences != null)
             {
                 PatchUnpatch(PatchTracker, apply, _detectSequences, postfix: nameof(DetectSequencesPostfix));
@@ -99,7 +160,7 @@ namespace StrmAssistant.Mod
         [HarmonyPrefix]
         private static bool MarkerDetectionSupportedPrefix(Video item, ref bool __result, out bool __state)
         {
-            __state = item != null && item.IsShortcut;
+            __state = ShouldForceDetectionSupport(item);
 
             if (__state)
             {
@@ -144,29 +205,53 @@ namespace StrmAssistant.Mod
             }
         }
 
+        [HarmonyPrefix]
+        private static bool IsCreditsDetectionEnabledPrefix(Video item, LibraryOptions libraryOptions,
+            ref bool __result, out bool __state)
+        {
+            var creditsDetectionEnabled = libraryOptions != null &&
+                                          _enableCreditsDetection?.GetValue(libraryOptions) is true;
+            __state = ShouldForceCreditsDetectionSupport(item, creditsDetectionEnabled);
+
+            if (__state)
+            {
+                __result = true;
+                return false;
+            }
+
+            return true;
+        }
+
+        [HarmonyPostfix]
+        private static void IsCreditsDetectionEnabledPostfix(Video item, LibraryOptions libraryOptions,
+            ref bool __result, bool __state)
+        {
+            if (__state)
+            {
+                __result = true;
+            }
+        }
+
         [HarmonyPostfix]
         private static void CreateQueryForEpisodeIntroDetectionPostfix(LibraryOptions libraryOptions, ref InternalItemsQuery __result)
         {
+            ApplyCurrentDetectionScope(__result);
+        }
+
+        [HarmonyPostfix]
+        private static void CreateQueryForCreditsDetectionPostfix(ref InternalItemsQuery __result)
+        {
+            ApplyCurrentDetectionScope(__result);
+        }
+
+        private static void ApplyCurrentDetectionScope(InternalItemsQuery query)
+        {
             Plugin.FingerprintApi.UpdateLibraryPathsInScope();
             var markerEnabledLibraryScope = Plugin.Instance.IntroSkipStore.GetOptions().Fingerprint.MarkerEnabledLibraryScope;
-
-            if (!string.IsNullOrEmpty(markerEnabledLibraryScope) && markerEnabledLibraryScope.Contains("-1"))
-            {
-                __result.ParentIds = Plugin.FingerprintApi.GetAllFavoriteSeasons().DefaultIfEmpty(-1).ToArray();
-            }
-            else
-            {
-                if (FingerprintApi.LibraryPathsInScope.Any())
-                {
-                    __result.PathStartsWithAny = FingerprintApi.LibraryPathsInScope.ToArray();
-                }
-                
-                var blackListSeasons = Plugin.FingerprintApi.GetAllBlacklistSeasons().ToArray();
-                if (blackListSeasons.Any())
-                {
-                    __result.ExcludeParentIds = blackListSeasons;
-                }
-            }
+            ApplyDetectionScope(query, FingerprintApi.LibraryPathsInScope,
+                Plugin.FingerprintApi.GetAllBlacklistSeasons(),
+                !string.IsNullOrEmpty(markerEnabledLibraryScope) && markerEnabledLibraryScope.Contains("-1"),
+                Plugin.FingerprintApi.GetAllFavoriteSeasons());
         }
 
         [HarmonyPostfix]
