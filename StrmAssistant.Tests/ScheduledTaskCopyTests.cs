@@ -31,7 +31,7 @@ namespace StrmAssistant.Tests
             { "LibraryOrderOptions_EditorTitle_Library_and_Order", "Libraries & Sorting", "媒体库与排序", "媒體庫與排序" },
             { "ExperienceEnhanceOptions_Group_Playback", "Playback, Cleanup & Safety", "播放、清理与安全", "播放、清理與安全" },
             { "MediaInfoExtractOptions_Group_ExtractionPerformance", "Extraction Control & Performance", "提取控制与性能", "擷取控制與效能" },
-            { "IntroSkipOptions_Group_Playback", "Playback & Skip", "播放与跳过", "播放與跳過" },
+            { "IntroSkipOptions_Group_Playback", "Playback Detection", "播放探测", "播放偵測" },
             { "NetworkProxyOptions_EditorTitle_Network_Direct_Link", "Network & Connections", "网络与连接", "網路與連線" },
             { "ScheduledTasks_EditorTitle_Scheduled_Tasks", "Task Shortcuts", "任务快捷入口", "任務捷徑" },
             { "MetadataEnhanceOptions_Group_ScrapeEpisodeGroup", "Episode Scraping & Grouping", "剧集刮削与分组", "劇集刮削與分組" },

@@ -78,7 +78,7 @@
     <value>剧集/混合库；留空包含全部。</value>
   </data>
   <data name="BrandOptions_PluginVersion" xml:space="preserve">
-    <value>插件版本：v{0}｜Emby 适配基线：{1}</value>
+    <value>插件版本：v{0} 💎 Emby 适配基线：{1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>神医助手 Plus</value>
@@ -1557,7 +1557,7 @@
     <value>在线刮削</value>
   </data>
   <data name="IntroSkipOptions_Group_Playback" xml:space="preserve">
-    <value>播放与跳过</value>
+    <value>播放探测</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_VersionMerge" xml:space="preserve">
     <value>合并</value>

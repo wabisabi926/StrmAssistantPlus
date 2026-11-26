@@ -267,8 +267,15 @@ namespace StrmAssistant.Common
 
                 if (exitCode == 0 && File.Exists(tempPath) && new FileInfo(tempPath).Length > 0)
                 {
-                    File.Delete(imagePath);
-                    File.Move(tempPath, imagePath);
+                    try
+                    {
+                        AtomicFileReplacer.Replace(tempPath, imagePath);
+                    }
+                    catch
+                    {
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                        throw;
+                    }
 
                     _logger.Info("ImagePostProcess - Cropped {0} from {1}x{2} to {3}x{4}",
                         Path.GetFileName(imagePath), width, height, targetW, targetH);

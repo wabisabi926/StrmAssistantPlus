@@ -10,6 +10,7 @@ using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
+using StrmAssistant.Core;
 using StrmAssistant.Mod;
 using StrmAssistant.Properties;
 using System;
@@ -51,7 +52,8 @@ namespace StrmAssistant.Common
                 if (embyProviders == null)
                 {
                     _logger.Error($"{nameof(VideoThumbnailApi)} - Failed to load Emby.Providers assembly");
-                    PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                    PatchTracker.MarkComponentsUnavailable("Failed to load Emby.Providers assembly",
+                        EmbyVersionAdapter.Instance.ApiVersion);
                     return;
                 }
 
@@ -112,34 +114,41 @@ namespace StrmAssistant.Common
                 if (_thumbnailGenerator == null) missingComponents.Add("ThumbnailGenerator");
                 if (_refreshThumbnailImages == null) missingComponents.Add("RefreshThumbnailImages");
 
+                PatchTracker.MarkComponentsUnavailable($"Missing components: {string.Join(", ", missingComponents)}",
+                    EmbyVersionAdapter.Instance.ApiVersion);
                 _logger.Warn($"{nameof(VideoThumbnailApi)} - Missing components: {string.Join(", ", missingComponents)}");
                 _logger.Info($"{nameof(VideoThumbnailApi)} - Video thumbnail extraction not available on this Emby version");
-                
-                PatchTracker.FallbackPatchApproach = PatchApproach.None;
-                
+
                 EmbyVersionCompatibility.LogCompatibilityInfo(
                     nameof(VideoThumbnailApi),
                     false,
                     "ThumbnailGenerator not available");
+                return;
             }
-            else if (Plugin.Instance.IsModSupported)
-            {
-                var paramCount = _refreshThumbnailImages?.GetParameters().Length ?? 0;
-                const string stubName = nameof(RefreshThumbnailImagesStub491);
 
-                if (paramCount != 10)
-                {
-                    _logger.Warn($"{nameof(VideoThumbnailApi)} - Unsupported RefreshThumbnailImages signature for Emby 4.9.1+: {paramCount} parameters");
-                    PatchTracker.FallbackPatchApproach = PatchApproach.Reflection;
-                }
-                
+            var signatureParamCount = _refreshThumbnailImages.GetParameters().Length;
+            if (signatureParamCount != 10)
+            {
+                PatchTracker.MarkComponentsUnavailable($"Unsupported RefreshThumbnailImages signature: {signatureParamCount} parameters",
+                    EmbyVersionAdapter.Instance.ApiVersion);
+                _logger.Warn($"{nameof(VideoThumbnailApi)} - Unsupported RefreshThumbnailImages signature for Emby 4.9.1+: {signatureParamCount} parameters");
+                EmbyVersionCompatibility.LogCompatibilityInfo(
+                    nameof(VideoThumbnailApi),
+                    false,
+                    "Unsupported RefreshThumbnailImages signature");
+                return;
+            }
+
+            if (Plugin.Instance.IsModSupported)
+            {
+                const string stubName = nameof(RefreshThumbnailImagesStub491);
                 var patchSuccess = PatchManager.ReversePatch(PatchTracker, _refreshThumbnailImages, stubName);
-                
+
                 if (patchSuccess && PatchTracker.FallbackPatchApproach == PatchApproach.Harmony)
                 {
-                    _logger.Info($"{nameof(VideoThumbnailApi)} - Harmony patch applied (stub: {stubName}, params: {paramCount})");
+                    _logger.Info($"{nameof(VideoThumbnailApi)} - Harmony patch applied (stub: {stubName}, params: {signatureParamCount})");
                 }
-                
+
                 EmbyVersionCompatibility.LogCompatibilityInfo(
                     nameof(VideoThumbnailApi),
                     true,
@@ -152,6 +161,15 @@ namespace StrmAssistant.Common
                     nameof(VideoThumbnailApi),
                     true,
                     "Reflection mode active");
+            }
+
+            if (PatchTracker.FallbackPatchApproach == PatchApproach.None)
+            {
+                PatchTracker.MarkUnsupported();
+            }
+            else
+            {
+                PatchTracker.MarkInitialized();
             }
         }
 

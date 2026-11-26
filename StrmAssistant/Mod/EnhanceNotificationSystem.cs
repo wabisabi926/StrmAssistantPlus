@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using StrmAssistant.Common;
 using StrmAssistant.Core;
 using static StrmAssistant.Mod.PatchManager;
 
@@ -228,10 +229,15 @@ namespace StrmAssistant.Mod
             }
         }
 
+        internal static bool ShouldNotifyDelete(Exception exception, Dictionary<string, bool?> state, bool dryRun)
+        {
+            return !dryRun && exception is null && state != null && state.Count > 0;
+        }
+
         [HarmonyFinalizer]
         private static void DeleteItemFinalizer(Exception __exception, BaseItem item, Dictionary<string, bool?> __state)
         {
-            if (__state != null && __state.Count > 0 && __exception is null && DeleteByUser.Value != null)
+            if (ShouldNotifyDelete(__exception, __state, DryRunMode.Enabled) && DeleteByUser.Value != null)
             {
                 var user = DeleteByUser.Value;
 

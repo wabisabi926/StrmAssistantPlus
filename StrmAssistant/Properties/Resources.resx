@@ -165,7 +165,7 @@
     <value>TV and mixed libraries; leave blank to include all.</value>
   </data>
   <data name="BrandOptions_PluginVersion" xml:space="preserve">
-    <value>Plugin: v{0} | Emby compatibility baseline: {1}</value>
+    <value>Plugin: v{0} 💎 Emby compatibility baseline: {1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>StrmAssistant Plus</value>
@@ -1644,7 +1644,7 @@
     <value>Online Scraping</value>
   </data>
   <data name="IntroSkipOptions_Group_Playback" xml:space="preserve">
-    <value>Playback &amp; Skip</value>
+    <value>Playback Detection</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_VersionMerge" xml:space="preserve">
     <value>Merge</value>

@@ -8,9 +8,9 @@ namespace StrmAssistant.Tests
     public class BrandOptionsTests
     {
         [Theory]
-        [InlineData("zh-CN", "插件版本：v{0}｜Emby 适配基线：4.11.0.19")]
-        [InlineData("zh-Hant", "外掛版本：v{0}｜Emby 適配基準：4.11.0.19")]
-        [InlineData("en-US", "Plugin: v{0} | Emby compatibility baseline: 4.11.0.19")]
+        [InlineData("zh-CN", "插件版本：v{0} 💎 Emby 适配基线：4.11.0.19")]
+        [InlineData("zh-Hant", "外掛版本：v{0} 💎 Emby 適配基準：4.11.0.19")]
+        [InlineData("en-US", "Plugin: v{0} 💎 Emby compatibility baseline: 4.11.0.19")]
         public void BrandLine_UsesLocalizedProfessionalFormat(string cultureName, string template)
         {
             var original = CultureInfo.CurrentUICulture;
@@ -20,7 +20,9 @@ namespace StrmAssistant.Tests
                 var text = new BrandOptions().PluginVersion.Text;
 
                 Assert.Equal(string.Format(template, AboutOptions.GetVersion()), text);
-                Assert.DoesNotContain("💎", text);
+                Assert.Contains("💎", text);
+                Assert.DoesNotContain("｜", text);
+                Assert.DoesNotContain(" | ", text);
                 Assert.DoesNotContain("+", text);
             }
             finally

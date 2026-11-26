@@ -196,7 +196,6 @@ namespace StrmAssistant.Web.Service
                 }
             }
 
-            response.Message = "ok";
             logger.Info($"MediaInfoMenu - Delete result: total={response.Total}, processed={response.Processed}, " +
                         $"succeeded={response.Succeeded}, failed={response.Failed}, skipped={response.Skipped}");
             return response;

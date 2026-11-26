@@ -55,7 +55,8 @@ namespace StrmAssistant.Common
                 if (embyProviders == null)
                 {
                     _logger.Error($"{nameof(SubtitleApi)} - Failed to load Emby.Providers assembly");
-                    PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                    PatchTracker.MarkComponentsUnavailable("Failed to load Emby.Providers assembly",
+                        EmbyVersionAdapter.Instance.ApiVersion);
                     return;
                 }
 
@@ -114,8 +115,10 @@ namespace StrmAssistant.Common
             if (_subtitleResolver is null || _getExternalSubtitleStreams is null ||
                 _ffProbeSubtitleInfo is null || _updateExternalSubtitleStream is null)
             {
-                PatchTracker.FallbackPatchApproach = PatchApproach.Reflection;
-                _logger.Info($"{nameof(SubtitleApi)} - Using fallback approach.");
+                PatchTracker.MarkComponentsUnavailable("Required subtitle components are unavailable",
+                    EmbyVersionAdapter.Instance.ApiVersion);
+                _logger.Info($"{nameof(SubtitleApi)} - Subtitle integration unavailable on this Emby version");
+                return;
             }
             else if (Plugin.Instance.IsModSupported)
             {
@@ -139,6 +142,15 @@ namespace StrmAssistant.Common
             if (Plugin.Instance.DebugMode)
             {
                 _logger.Debug($"[SubtitleApi] ✓ Initialize done - SubtitleResolver={( _subtitleResolver != null ? "OK" : "NULL")}, Fallback={PatchTracker.FallbackPatchApproach}");
+            }
+
+            if (PatchTracker.FallbackPatchApproach == PatchApproach.None)
+            {
+                PatchTracker.MarkUnsupported();
+            }
+            else
+            {
+                PatchTracker.MarkInitialized();
             }
         }
 

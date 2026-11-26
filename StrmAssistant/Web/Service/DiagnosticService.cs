@@ -159,17 +159,19 @@ namespace StrmAssistant.Web.Service
 
         private static PatchSummary BuildSummary(List<PatchTracker> list)
         {
-            var supported = list.Where(p => p.IsSupported).ToList();
+            var unsupported = list.Where(p => !p.IsSupported || p.Status == StrmAssistant.Mod.PatchStatus.NotSupported).ToList();
+            var supported = list.Where(p => p.IsSupported && p.Status != StrmAssistant.Mod.PatchStatus.NotSupported).ToList();
+            var enabled = supported.Where(p => p.IsFeatureEnabled).ToList();
             return new PatchSummary
             {
                 Total = list.Count,
                 Supported = supported.Count,
-                Running = supported.Count(p => p.IsRunning),
-                Healthy = supported.Count(p => p.IsHealthy),
-                Failed = supported.Count(p => !p.IsHealthy),
+                Running = enabled.Count(p => p.IsRunning),
+                Healthy = enabled.Count(p => p.IsHealthy),
+                Failed = enabled.Count(p => !p.IsHealthy),
                 Skipped = supported.Count(p => !p.IsFeatureEnabled),
                 WithErrors = supported.Count(p => p.HasErrors),
-                Unsupported = list.Count(p => !p.IsSupported)
+                Unsupported = unsupported.Count
             };
         }
     }

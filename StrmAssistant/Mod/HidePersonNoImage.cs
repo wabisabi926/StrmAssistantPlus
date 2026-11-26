@@ -46,8 +46,11 @@ namespace StrmAssistant.Mod
 
             _getBaseItemDto = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDto",
                 new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User) })).Method;
-            _getBaseItemDtos = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
-                new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User) })).Method;
+            if (DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion))
+            {
+                _getBaseItemDtos = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
+                    new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User) })).Method;
+            }
 
             _getBaseItemDtoWithCancellation = EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDto",
                 new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User), typeof(CancellationToken) }).Method;
@@ -66,7 +69,7 @@ namespace StrmAssistant.Mod
         {
             // 4.11 的批量 GetBaseItemDtos 一旦 patch 会让 Items/首页 DTO 卡死（隔离实例实测）；
             // 只挂单条目重载，详情页过滤可用，批量列表暂不处理。
-            var singleOnly = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11;
+            var singleOnly = !DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion);
 
             PatchUnpatch(PatchTracker, apply, _getBaseItemDto, postfix: nameof(GetBaseItemDtoPostfix));
 

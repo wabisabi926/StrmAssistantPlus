@@ -66,8 +66,7 @@ namespace StrmAssistant.Common
             if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
             {
                 // 4.11 由 MarkerDetector 原生完成片头/片尾检测；旧的指纹生成入口不再存在。
-                PatchTracker.IsSupported = false;
-                PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                PatchTracker.MarkUnsupported();
                 _logger.Info("FingerprintApi - disabled on Emby 4.11 (native MarkerDetector pipeline)");
                 return;
             }
@@ -78,7 +77,7 @@ namespace StrmAssistant.Common
                 if (embyProviders == null)
                 {
                     _logger.Error($"{nameof(FingerprintApi)} - Failed to load Emby.Providers assembly");
-                    PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                    PatchTracker.MarkFailed("Failed to load Emby.Providers assembly");
                     return;
                 }
 
@@ -164,6 +163,15 @@ namespace StrmAssistant.Common
             if (Plugin.Instance.DebugMode)
             {
                 _logger.Debug($"[FingerprintApi] ✓ Initialize done - Fallback={PatchTracker.FallbackPatchApproach}, Status={PatchTracker.Status}");
+            }
+
+            if (PatchTracker.FallbackPatchApproach == PatchApproach.None)
+            {
+                PatchTracker.MarkFailed("Required fingerprint components are unavailable");
+            }
+            else
+            {
+                PatchTracker.MarkInitialized();
             }
         }
 

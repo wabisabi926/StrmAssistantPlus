@@ -1,3 +1,5 @@
+using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 
@@ -137,8 +139,39 @@ namespace StrmAssistant.Mod
             FallbackPatchApproach != PatchApproach.None &&
             MissingTargets.Count == 0 &&
             !HasErrors &&
-            Status != PatchStatus.Failed &&
-            Status != PatchStatus.NotSupported;
+            (Status == PatchStatus.Initialized || Status == PatchStatus.Applied);
+
+        public void MarkInitialized()
+        {
+            Status = PatchStatus.Initialized;
+            InitializedAt = DateTime.Now;
+        }
+
+        public void MarkUnsupported()
+        {
+            IsSupported = false;
+            FallbackPatchApproach = PatchApproach.None;
+            Status = PatchStatus.NotSupported;
+        }
+
+        public void MarkFailed(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message)) AddError(message);
+            FallbackPatchApproach = PatchApproach.None;
+            Status = PatchStatus.Failed;
+        }
+
+        public void MarkComponentsUnavailable(string message, EmbyApiVersion version)
+        {
+            if (ApiAvailabilityPolicy.MissingComponentsAreUnsupported(version))
+            {
+                MarkUnsupported();
+            }
+            else
+            {
+                MarkFailed(message);
+            }
+        }
         
         /// <summary>
         /// 获取状态摘要

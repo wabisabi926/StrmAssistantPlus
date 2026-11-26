@@ -8,15 +8,17 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 655/655 通过；Release 构建 0 警告 0 错误。
+- 单测 692/692 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行。
+- 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
 - 关闭功能 smoke：MergeMultiVersion、ServerSideVersionLabel、CustomLocalDiscovery（4.10/4.11）、深度删除自定义通知通过。
 - 4.11 通知保留原生分组与插件自定义通知；剧集摘要注入确认为不可靠，已跳过相关钩子。4.10 完整通知补丁可用。
 - 明确限制：4.11 不挂批量 DTO、不 patch `SaveChapters`；ExclusiveExtract 保持受限模式并关闭；插件指纹使用原生检测。
 - `UnlockIntroSkip` STRM 修复通过：两集均被原生任务选中，MarkerDetector 返回 `supported=True`。
 - 测试 Webhook、临时库和 smoke 媒体已清理；STRM 验收目录与反编译文件已按用户确认删除。4.10 无效 `simple.dll` 与历史 DLL 备份已删除；未保留 Emby 或插件备份。
-- 源码改动未提交，未升版本号、未打 tag、未发版；发布前需用户确认。
+- 4.11 适配源码已提交到本地 `main`；发布前安全修复已完成，待提交/推送、升版本号、打 tag 和发版，均需用户确认。
+- 运行时验收：同一最终 DLL（SHA-256 `ea24a80a…`）已部署到 4.11.0.19 与 4.10.2.0，两套启动日志均为 Healthy；六个设置页签已逐页打开，失败横幅已消除，品牌行钻石图标与“播放探测”标题已在本机两套页面确认。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）

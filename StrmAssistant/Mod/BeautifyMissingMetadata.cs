@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
+using StrmAssistant.Common;
 using StrmAssistant.Core;
 using System;
 using System.IO;
@@ -50,10 +51,13 @@ namespace StrmAssistant.Mod
             var dtoServiceImpl = EmbyTargetResolver.FindImplementationType(
                 embyServerImplementationsAssembly, typeof(IDtoService));
 
-            _getBaseItemDtos = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
-                new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User) })).Method;
             _getBaseItemDto = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDto",
                 new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User) })).Method;
+            if (DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion))
+            {
+                _getBaseItemDtos = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
+                    new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User) })).Method;
+            }
 
             _getBaseItemDtosWithCancellation = EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
                 new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User), typeof(System.Threading.CancellationToken) }).Method;
@@ -79,7 +83,7 @@ namespace StrmAssistant.Mod
 
         protected override void Prepare(bool apply)
         {
-            var singleOnly = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11;
+            var singleOnly = !DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion);
 
             PatchUnpatch(PatchTracker, apply, _getBaseItemDto, postfix: nameof(GetBaseItemDtoPostfix));
 

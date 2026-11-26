@@ -14,7 +14,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using static StrmAssistant.Common.CommonUtility;
 using static StrmAssistant.Options.VersionMergeOptions;
 
 namespace StrmAssistant.ScheduledTask
@@ -236,7 +235,8 @@ namespace StrmAssistant.ScheduledTask
 
             var dupSeries = allSeries
                 .SelectMany(item =>
-                    item.ProviderIds.Where(kvp => ProviderIdCheckKeys.Contains(kvp.Key))
+                    item.ProviderIds.Where(kvp => ProviderIdCheckKeys.Contains(kvp.Key) &&
+                                                   !string.IsNullOrWhiteSpace(kvp.Value))
                         .Select(kvp => new { kvp.Key, kvp.Value, item }))
                 .GroupBy(x => new { x.Key, x.Value })
                 .Where(g => g.Select(x => x.item.InternalId).Distinct().Count() > 1)
@@ -329,64 +329,26 @@ namespace StrmAssistant.ScheduledTask
                 return _libraryManager.GetItemList(query);
             }).Cast<Movie>().ToList();
 
-            var providerGroups = allMovies
-                .SelectMany(item =>
-                    item.ProviderIds.Where(kvp => ProviderIdCheckKeys.Contains(kvp.Key))
-                        .Select(kvp => new { kvp.Key, kvp.Value, item }))
-                .GroupBy(kvp => new { kvp.Key, kvp.Value })
-                .ToList();
-            _logger.Info($"MergeMultiVersion - Movie candidates: {allMovies.Count}, provider groups: {providerGroups.Count}, largest group: {(providerGroups.Count == 0 ? 0 : providerGroups.Max(g => g.Count()))}");
+            var plan = VersionMergePlanner.Plan(allMovies, movie => movie.InternalId,
+                movie => movie.ProviderIds);
+            _logger.Info($"MergeMultiVersion - Movie candidates: {allMovies.Count}, merge groups: {plan.Groups.Count}, conflicts: {plan.Conflicts.Count}");
 
-            var dupMovies = providerGroups
-                .Where(g => g.Select(kvp => kvp.item.InternalId).Distinct().Count() > 1)
-                .ToList();
+            foreach (var conflict in plan.Conflicts)
+            {
+                _logger.Warn($"MergeMultiVersion - Skipped conflicting {conflict.ProviderKey} group: {string.Join(",", conflict.Values)}; items: {string.Join(",", conflict.Items.Select(item => item.InternalId))}");
+            }
+
             allMovies.Clear();
             allMovies.TrimExcess();
 
-            if (dupMovies.Count > 0)
+            if (plan.Groups.Count > 0)
             {
-                var parentMap = new Dictionary<long, long>(dupMovies.Count);
-
-                foreach (var group in dupMovies)
-                {
-                    long rootId = -1;
-
-                    foreach (var kvp in group)
-                    {
-                        var movie = kvp.item;
-
-                        if (!parentMap.ContainsKey(movie.InternalId))
-                        {
-                            parentMap[movie.InternalId] = movie.InternalId;
-                        }
-
-                        if (rootId == -1)
-                            rootId = movie.InternalId;
-                        else
-                            Union(rootId, movie.InternalId, parentMap);
-                    }
-                }
-
-                var rootIdGroups = parentMap.Values.GroupBy(id => Find(id, parentMap)).ToList();
-
-                var movieLookup = dupMovies.SelectMany(g => g)
-                    .GroupBy(kvp => Find(kvp.item.InternalId, parentMap))
-                    .ToDictionary(d => d.Key,
-                        d => d.GroupBy(kvp => kvp.item.InternalId).Select(g => g.First().item).ToList());
-
-                var total = rootIdGroups.Count;
+                var total = plan.Groups.Count;
                 var current = 0;
 
-                foreach (var group in rootIdGroups)
+                foreach (var group in plan.Groups)
                 {
-                    var movies = group
-                        .SelectMany(
-                            rootId => movieLookup.TryGetValue(rootId, out var m) ? m : Enumerable.Empty<Movie>())
-                        .GroupBy(m => m.InternalId)
-                        .Select(g => g.First())
-                        .OfType<BaseItem>()
-                        .ToArray();
-
+                    var movies = group.OfType<BaseItem>().ToArray();
                     _libraryManager.MergeItems(movies);
 
                     foreach (var item in movies)

@@ -166,7 +166,9 @@ namespace StrmAssistant.Common
 			}
 		}
 		catch { /* 4.9.1.90+ 结构改变，静默跳过即可 */ }
-				}
+
+            PatchTracker.MarkInitialized();
+        }
 
         [HarmonyReversePatch]
         // ★ 4.9/4.10 兼容修复：真实签名 GetStaticMediaSources(BaseItem item, bool enablePathSubstitution,

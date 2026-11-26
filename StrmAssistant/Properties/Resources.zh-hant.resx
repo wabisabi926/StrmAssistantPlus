@@ -78,7 +78,7 @@
     <value>劇集/混合庫；留空包含全部。</value>
   </data>
   <data name="BrandOptions_PluginVersion" xml:space="preserve">
-    <value>外掛版本：v{0}｜Emby 適配基準：{1}</value>
+    <value>外掛版本：v{0} 💎 Emby 適配基準：{1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>神醫助手 Plus</value>
@@ -1557,7 +1557,7 @@
     <value>線上刮削</value>
   </data>
   <data name="IntroSkipOptions_Group_Playback" xml:space="preserve">
-    <value>播放與跳過</value>
+    <value>播放偵測</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_VersionMerge" xml:space="preserve">
     <value>合併</value>

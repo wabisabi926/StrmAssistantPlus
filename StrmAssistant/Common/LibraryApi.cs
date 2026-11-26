@@ -1783,7 +1783,7 @@ namespace StrmAssistant.Common
                 var mediaSources =
                     workItem.GetMediaSources(!single, false, _libraryManager.GetLibraryOptions(workItem));
                 mediaSources = mediaSources.Where(s =>
-                        single || scope?.Any(p => s.Path.StartsWith(p, StringComparison.OrdinalIgnoreCase)) is true)
+                        single || scope?.Any(p => PathBoundary.IsSameOrDescendant(s.Path, p)) is true)
                     .ToList();
 
                 var staticMediaSources = Plugin.MediaInfoApi.GetStaticMediaSources(workItem, !single)
@@ -1832,12 +1832,6 @@ namespace StrmAssistant.Common
                 foreach (var path in GetDeletePaths(mountPath))
                 {
                     deletePaths.Add(path);
-                    var folderPath = _fileSystem.GetDirectoryName(path.FullName);
-
-                    if (folderPath != null)
-                    {
-                        deletePaths.Add(new FileSystemMetadata { FullName = folderPath, IsDirectory = true });
-                    }
                 }
             }
 
@@ -1854,37 +1848,6 @@ namespace StrmAssistant.Common
                     _logger.Error(e.Message);
                     _logger.Debug(e.StackTrace);
                 }
-            }
-
-            var folderPaths = new HashSet<FileSystemMetadata>(deletePaths.Where(p => p.IsDirectory),
-                new FileSystemMetadataComparer());
-
-            while (folderPaths.Any())
-            {
-                var path = folderPaths.First();
-
-                try
-                {
-                    if (IsDirectoryEmpty(path.FullName))
-                    {
-                        _logger.Info("DeepDelete - Attempting to delete empty folder: " + path.FullName);
-                        _fileSystem.DeleteDirectory(path.FullName, true, true);
-
-                        var parentPath = _fileSystem.GetDirectoryName(path.FullName);
-                        if (parentPath != null)
-                        {
-                            folderPaths.Add(new FileSystemMetadata { FullName = parentPath, IsDirectory = true });
-                        }
-                    }
-                }
-                catch (Exception e)
-                {
-                    _logger.Error("DeepDelete - Failed to delete empty folder: " + path.FullName);
-                    _logger.Error(e.Message);
-                    _logger.Debug(e.StackTrace);
-                }
-
-                folderPaths.Remove(path);
             }
         }
 
