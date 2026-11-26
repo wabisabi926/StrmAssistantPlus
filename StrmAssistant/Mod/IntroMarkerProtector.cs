@@ -66,7 +66,11 @@ namespace StrmAssistant.Mod
 
         protected override void Prepare(bool apply)
         {
-            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11) return;
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                PatchTracker.MarkAlternativeActive("post-refresh marker snapshot/restore");
+                return;
+            }
             PatchUnpatch(PatchTracker, apply, _saveChapters, prefix: nameof(SaveChaptersPrefix));
         }
 

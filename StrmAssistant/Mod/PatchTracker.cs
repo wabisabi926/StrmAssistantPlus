@@ -33,6 +33,7 @@ namespace StrmAssistant.Mod
         /// 已应用
         /// </summary>
         Applied,
+        AlternativeActive,
         
         /// <summary>
         /// 初始化失败
@@ -91,6 +92,7 @@ namespace StrmAssistant.Mod
         /// 错误消息列表
         /// </summary>
         public List<string> ErrorMessages { get; }
+        public string AlternativeReason { get; set; }
         
         /// <summary>
         /// 是否为核心补丁（失败时会影响整体功能）
@@ -139,7 +141,8 @@ namespace StrmAssistant.Mod
             FallbackPatchApproach != PatchApproach.None &&
             MissingTargets.Count == 0 &&
             !HasErrors &&
-            (Status == PatchStatus.Initialized || Status == PatchStatus.Applied);
+            (Status == PatchStatus.Initialized || Status == PatchStatus.Applied ||
+             Status == PatchStatus.AlternativeActive);
 
         public void MarkInitialized()
         {
@@ -171,6 +174,25 @@ namespace StrmAssistant.Mod
             {
                 MarkFailed(message);
             }
+        }
+
+        public void MarkInitializationFailed(string message)
+        {
+            if (!string.IsNullOrWhiteSpace(message)) AddError(message);
+            FallbackPatchApproach = PatchApproach.None;
+            Status = PatchStatus.Failed;
+        }
+
+        public void MarkAlternativeActive(string reason)
+        {
+            AlternativeReason = reason;
+            Status = PatchStatus.AlternativeActive;
+        }
+
+        public void CompletePatch()
+        {
+            if (Status == PatchStatus.AlternativeActive && !HasErrors) return;
+            Status = HasErrors ? PatchStatus.Failed : PatchStatus.Applied;
         }
         
         /// <summary>

@@ -1,5 +1,6 @@
 using StrmAssistant.Mod;
 using StrmAssistant.Web.Service;
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 using Xunit;
@@ -241,6 +242,81 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void MarkInitializationFailed_RemainsFailedWithErrors()
+        {
+            var tracker = CreateTracker();
+            try
+            {
+                tracker.MarkInitializationFailed("resolver exploded");
+
+                Assert.Equal(PatchStatus.Failed, tracker.Status);
+                Assert.Equal(PatchApproach.None, tracker.FallbackPatchApproach);
+                Assert.True(tracker.HasErrors);
+                Assert.False(tracker.IsHealthy);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
+        [Fact]
+        public void MarkAlternativeActive_IsHealthyAndPreservesReason()
+        {
+            var tracker = CreateTracker();
+            try
+            {
+                tracker.MarkAlternativeActive("native transaction + snapshot restore");
+
+                Assert.Equal(PatchStatus.AlternativeActive, tracker.Status);
+                Assert.Equal("native transaction + snapshot restore", tracker.AlternativeReason);
+                Assert.True(tracker.IsHealthy);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
+        [Fact]
+        public void CompletePatch_PreservesAlternativeActive()
+        {
+            var tracker = CreateTracker();
+            try
+            {
+                tracker.MarkAlternativeActive("setter-based DTO filter");
+
+                tracker.CompletePatch();
+
+                Assert.Equal(PatchStatus.AlternativeActive, tracker.Status);
+                Assert.True(tracker.IsHealthy);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
+        [Fact]
+        public void CompletePatch_MarksNormalSuccessApplied()
+        {
+            var tracker = CreateTracker();
+            try
+            {
+                tracker.Status = PatchStatus.Initialized;
+
+                tracker.CompletePatch();
+
+                Assert.Equal(PatchStatus.Applied, tracker.Status);
+                Assert.True(tracker.IsHealthy);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
+        [Fact]
         public void BuildSummary_TreatsNotSupportedStatusAsUnsupported()
         {
             var tracker = CreateTracker();
@@ -273,6 +349,65 @@ namespace StrmAssistant.Tests
             {
                 PatchManager.PatchTrackerList.Remove(optional);
                 PatchManager.PatchTrackerList.Remove(core);
+            }
+        }
+
+        [Fact]
+        public void Patch_PreservesInitializationFailure()
+        {
+            var patch = new NoopPatch();
+            try
+            {
+                patch.PatchTracker.MarkInitializationFailed("resolver exploded");
+
+                patch.Patch();
+
+                Assert.Equal(PatchStatus.Failed, patch.PatchTracker.Status);
+                Assert.True(patch.PatchTracker.HasErrors);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(patch.PatchTracker);
+            }
+        }
+
+        [Fact]
+        public void Patch_PrepareExceptionBecomesFailed()
+        {
+            var patch = new ThrowingPreparePatch();
+            try
+            {
+                patch.Patch();
+
+                Assert.Equal(PatchStatus.Failed, patch.PatchTracker.Status);
+                Assert.True(patch.PatchTracker.HasErrors);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(patch.PatchTracker);
+            }
+        }
+
+        private sealed class NoopPatch : PatchBase<NoopPatch>
+        {
+            protected override void OnInitialize()
+            {
+            }
+
+            protected override void Prepare(bool apply)
+            {
+            }
+        }
+
+        private sealed class ThrowingPreparePatch : PatchBase<ThrowingPreparePatch>
+        {
+            protected override void OnInitialize()
+            {
+            }
+
+            protected override void Prepare(bool apply)
+            {
+                throw new InvalidOperationException("prepare exploded");
             }
         }
 

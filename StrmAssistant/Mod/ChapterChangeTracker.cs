@@ -66,6 +66,7 @@ namespace StrmAssistant.Mod
         {
             if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
             {
+                PatchTracker.MarkAlternativeActive("native chapter transaction; plugin extraction uses marker snapshot/restore");
                 Plugin.Instance.Logger.Info(
                     "ChapterChangeTracker - 4.11: SaveChapters hook skipped (native chapter transaction)");
                 return;

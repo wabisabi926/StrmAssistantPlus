@@ -47,6 +47,7 @@ namespace StrmAssistant.Web.Service
             public bool IsCoreFeature { get; set; }
             public string Status { get; set; }
             public string Approach { get; set; }
+            public string AlternativeReason { get; set; }
             public bool HasErrors { get; set; }
             public List<string> Errors { get; set; }
         }
@@ -138,6 +139,7 @@ namespace StrmAssistant.Web.Service
                         Approach = p.FallbackPatchApproach == p.DefaultPatchApproach
                             ? p.DefaultPatchApproach.ToString()
                             : $"{p.DefaultPatchApproach} -> {p.FallbackPatchApproach}",
+                        AlternativeReason = p.AlternativeReason,
                         HasErrors = p.HasErrors,
                         Errors = p.ErrorMessages.Take(3).ToList()
                     })

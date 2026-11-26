@@ -60,9 +60,8 @@ namespace StrmAssistant.Mod
             }
             catch (Exception e)
             {
-                PatchTracker.Status = PatchStatus.Failed;
-                PatchTracker.AddError($"Initialization failed: {e.Message}");
-                
+                PatchTracker.MarkInitializationFailed($"Initialization failed: {e.Message}");
+
                 if (Plugin.Instance.DebugMode)
                 {
                     Plugin.Instance.Logger.Debug($"[{PatchTracker.PatchType.Name}] ✗ OnInitialize EXCEPTION: {e.Message}");
@@ -70,7 +69,7 @@ namespace StrmAssistant.Mod
                 }
 
                 Plugin.Instance.Logger.Warn($"{PatchTracker.PatchType.Name} Init Failed: {e.Message}");
-                PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                return;
             }
 
             if (PatchTracker.FallbackPatchApproach == PatchApproach.None)
@@ -109,11 +108,13 @@ namespace StrmAssistant.Mod
 
         public void Patch()
         {
+            if (PatchTracker.Status == PatchStatus.Failed) return;
+
             if (PatchTracker.FallbackPatchApproach == PatchApproach.None || PatchTracker.MissingTargets.Count > 0)
             {
                 PatchTracker.Status = PatchStatus.NotSupported;
 
-                if (Plugin.Instance.DebugMode)
+                if (Plugin.Instance?.DebugMode == true)
                 {
                     Plugin.Instance.Logger.Debug(
                         $"[{PatchTracker.PatchType.Name}] Patch() skipped - unsupported on this Emby build");
@@ -122,27 +123,33 @@ namespace StrmAssistant.Mod
                 return;
             }
 
-            // ★ 统一 debug 日志：模块 Patch 应用前
-            if (Plugin.Instance.DebugMode)
+            if (Plugin.Instance?.DebugMode == true)
             {
                 Plugin.Instance.Logger.Debug($"[{PatchTracker.PatchType.Name}] ▶ Patch() applying (Fallback={PatchTracker.FallbackPatchApproach})");
             }
 
             var hadErrors = PatchTracker.HasErrors;
 
-            Prepare(true);
-            PatchTracker.Status = PatchTracker.HasErrors ? PatchStatus.Failed : PatchStatus.Applied;
+            try
+            {
+                Prepare(true);
+            }
+            catch (Exception e)
+            {
+                PatchTracker.MarkFailed($"Patch application failed: {e.Message}");
+                Plugin.Instance?.Logger?.Warn($"{PatchTracker.PatchType.Name} Patch Failed: {e.Message}");
+                return;
+            }
 
-            // Prepare 是 void，模块无法回报「某条补丁其实没打上」；PatchUnpatch 失败会记进
-            // PatchTracker.AddError，这里据此补一条告警，避免状态页显示 Applied 而功能实际缺失。
+            PatchTracker.CompletePatch();
+
             if (!hadErrors && PatchTracker.HasErrors)
             {
-                Plugin.Instance.Logger.Warn(
+                Plugin.Instance?.Logger?.Warn(
                     $"[{PatchTracker.PatchType.Name}] 部分补丁未能应用，功能可能不完整（详见运行时状态页）");
             }
 
-            // ★ 统一 debug 日志：模块 Patch 应用后
-            if (Plugin.Instance.DebugMode)
+            if (Plugin.Instance?.DebugMode == true)
             {
                 Plugin.Instance.Logger.Debug($"[{PatchTracker.PatchType.Name}] Patch() finished - Status={PatchTracker.Status}, Healthy={PatchTracker.IsHealthy}");
             }
