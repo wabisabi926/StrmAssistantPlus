@@ -5,7 +5,10 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
+using StrmAssistant.Core;
 using System;
+using System.IO;
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -16,7 +19,13 @@ namespace StrmAssistant.Mod
     public class BeautifyMissingMetadata : PatchBase<BeautifyMissingMetadata>
     {
         private static MethodInfo _getBaseItemDtos;
+        private static MethodInfo _getBaseItemDtosWithCancellation;
         private static MethodInfo _getBaseItemDto;
+        private static MethodInfo _getBaseItemDtoWithCancellation;
+        private static MethodInfo _setName;
+        private static MethodInfo _setPath;
+        private static readonly List<MethodInfo> _beautifySetters = new List<MethodInfo>();
+        private static bool _logged411Partial;
 
         private static MethodInfo _getMainExpression;
         private static readonly string SeasonNumberAndEpisodeNumberExpression =
@@ -24,9 +33,12 @@ namespace StrmAssistant.Mod
 
         public BeautifyMissingMetadata()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().ItemDisplay.BeautifyMissingMetadata;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().ItemDisplay.BeautifyMissingMetadata)
+            if (enabled)
             {
                 Patch();
             }
@@ -35,23 +47,88 @@ namespace StrmAssistant.Mod
         protected override void OnInitialize()
         {
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
-            var dtoService =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Dto.DtoService");
-            _getBaseItemDtos = dtoService.GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                .Where(m => m.Name == "GetBaseItemDtos").OrderByDescending(m => m.GetParameters().Length)
-                .FirstOrDefault();
-            _getBaseItemDto = dtoService.GetMethod("GetBaseItemDto", BindingFlags.Public | BindingFlags.Instance,
-                null, new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User) }, null);
+            var dtoServiceImpl = EmbyTargetResolver.FindImplementationType(
+                embyServerImplementationsAssembly, typeof(IDtoService));
 
-            _getMainExpression =
-                typeof(NamingOptions).GetMethod("GetMainExpression", BindingFlags.NonPublic | BindingFlags.Static);
+            _getBaseItemDtos = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
+                new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User) })).Method;
+            _getBaseItemDto = Require(EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDto",
+                new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User) })).Method;
+
+            _getBaseItemDtosWithCancellation = EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
+                new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User), typeof(System.Threading.CancellationToken) }).Method;
+            _getBaseItemDtoWithCancellation = EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDto",
+                new[] { typeof(BaseItem), typeof(DtoOptions), typeof(User), typeof(System.Threading.CancellationToken) }).Method;
+
+            _getMainExpression = EmbyTargetResolver.ResolveByName(typeof(NamingOptions), "GetMainExpression",
+                new[] { typeof(bool), typeof(bool), typeof(bool) }, typeof(string), true).Method;
+
+            _setName = typeof(BaseItemDto).GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetSetMethod(true);
+            _setPath = typeof(BaseItemDto).GetProperty("Path", BindingFlags.Public | BindingFlags.Instance)
+                ?.GetSetMethod(true);
+
+            _beautifySetters.Clear();
+            foreach (var propertyName in new[] { "Type", "IndexNumber", "PreferredMetadataLanguage" })
+            {
+                var setter = typeof(BaseItemDto).GetProperty(propertyName,
+                    BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
+                if (setter != null) _beautifySetters.Add(setter);
+            }
         }
 
         protected override void Prepare(bool apply)
         {
-            PatchUnpatch(PatchTracker, apply, _getBaseItemDtos, postfix: nameof(GetBaseItemDtosPostfix));
+            var singleOnly = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11;
+
             PatchUnpatch(PatchTracker, apply, _getBaseItemDto, postfix: nameof(GetBaseItemDtoPostfix));
-            PatchUnpatch(PatchTracker, apply, _getMainExpression, postfix: nameof(GetMainExpressionPostfix));
+
+            if (_getBaseItemDtoWithCancellation != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _getBaseItemDtoWithCancellation,
+                    postfix: nameof(GetBaseItemDtoPostfix));
+            }
+
+            if (!singleOnly)
+            {
+                PatchUnpatch(PatchTracker, apply, _getBaseItemDtos, postfix: nameof(GetBaseItemDtosPostfix));
+
+                if (_getBaseItemDtosWithCancellation != null)
+                {
+                    PatchUnpatch(PatchTracker, apply, _getBaseItemDtosWithCancellation,
+                        postfix: nameof(GetBaseItemDtosPostfix));
+                }
+            }
+            else
+            {
+                // 4.11 的批量 GetBaseItemDtos patch 会卡死；改挂模型 setter，Name/Path 谁后赋值都能触发。
+                if (_setName != null)
+                {
+                    PatchUnpatch(PatchTracker, apply, _setName, postfix: nameof(SetNamePostfix));
+                }
+
+                if (_setPath != null)
+                {
+                    PatchUnpatch(PatchTracker, apply, _setPath, postfix: nameof(SetPathPostfix));
+                }
+
+                foreach (var setter in _beautifySetters)
+                {
+                    PatchUnpatch(PatchTracker, apply, setter, postfix: nameof(SetNamePostfix));
+                }
+
+                if (apply && !_logged411Partial)
+                {
+                    _logged411Partial = true;
+                    Plugin.Instance.Logger.Info(
+                        "BeautifyMissingMetadata - 4.11: batch DTO patch disabled; BaseItemDto Name/Path setter beautify active");
+                }
+            }
+
+            if (_getMainExpression != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _getMainExpression, postfix: nameof(GetMainExpressionPostfix));
+            }
         }
 
         [HarmonyPostfix]
@@ -112,6 +189,37 @@ namespace StrmAssistant.Mod
             {
                 __result.Name = $"第 {item.IndexNumber} 集";
             }
+        }
+
+        [HarmonyPostfix]
+        private static void SetNamePostfix(BaseItemDto __instance)
+        {
+            ApplyDtoBeautify(__instance);
+        }
+
+        [HarmonyPostfix]
+        private static void SetPathPostfix(BaseItemDto __instance)
+        {
+            ApplyDtoBeautify(__instance);
+        }
+
+        private static void ApplyDtoBeautify(BaseItemDto dto)
+        {
+            if (dto == null) return;
+            if (!string.Equals(dto.Type, nameof(Episode), StringComparison.OrdinalIgnoreCase)) return;
+            if (!dto.IndexNumber.HasValue) return;
+            if (!string.IsNullOrEmpty(dto.PreferredMetadataLanguage) &&
+                !dto.PreferredMetadataLanguage.StartsWith("zh", StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (string.IsNullOrEmpty(dto.Path)) return;
+
+            var fileName = Path.GetFileNameWithoutExtension(dto.Path);
+            if (string.IsNullOrEmpty(fileName)) return;
+            if (!string.Equals(dto.Name, fileName, StringComparison.Ordinal)) return;
+
+            dto.Name = $"第 {dto.IndexNumber} 集";
         }
 
         [HarmonyPostfix]

@@ -1,7 +1,9 @@
 ﻿using HarmonyLib;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Library;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -14,13 +16,16 @@ namespace StrmAssistant.Mod
     public class NoBoxsetsAutoCreation : PatchBase<NoBoxsetsAutoCreation>
     {
         private static MethodInfo _ensureLibraryFolder;
-        private static MethodInfo _getUserViews;
+        private static readonly List<MethodInfo> _getUserViewsTargets = new List<MethodInfo>();
 
         public NoBoxsetsAutoCreation()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().LibraryOrder.NoBoxsetsAutoCreation;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().LibraryOrder.NoBoxsetsAutoCreation)
+            if (enabled)
             {
                 Patch();
             }
@@ -29,28 +34,47 @@ namespace StrmAssistant.Mod
         protected override void OnInitialize()
         {
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
-            
-            // 1. 自动创建合集文件夹的方法
+
+            // 4.9/4.10：禁止 Emby 自动创建合集库；4.11 已无此方法（实测）。
             var collectionManager = embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Collections.CollectionManager");
             _ensureLibraryFolder = collectionManager?.GetMethod("EnsureLibraryFolder", BindingFlags.Instance | BindingFlags.NonPublic);
-            
-            // 2. 用户视图查询方法（仅支持 4.9.1+ 的 3 参数版本）
-            var userViewManager = embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Library.UserViewManager");
-            _getUserViews = userViewManager?.GetMethods(BindingFlags.Instance | BindingFlags.Public)
-                .FirstOrDefault(m => m.Name == "GetUserViews" && m.GetParameters().Length == 3);
 
-            if (_ensureLibraryFolder == null || _getUserViews == null)
+            // 用户视图过滤：4.11 的 UserViewManager 类型名被混淆，从接口实现取。
+            var userViewManagerImpl = EmbyTargetResolver.FindImplementationType(
+                embyServerImplementationsAssembly, typeof(IUserViewManager));
+            if (userViewManagerImpl != null)
             {
-                Plugin.Instance.Logger.Warn("NoBoxsetsAutoCreation - Required methods for Emby 4.9.1+ not found");
-                PatchTracker.FallbackPatchApproach = PatchApproach.None;
-                PatchTracker.IsSupported = false;
+                foreach (var method in userViewManagerImpl.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                             .Where(m => m.Name == "GetUserViews" && m.ReturnType == typeof(Folder[])))
+                {
+                    _getUserViewsTargets.Add(method);
+                }
+            }
+
+            if (_getUserViewsTargets.Count == 0)
+            {
+                Require(TargetResolution.Missing(
+                    "IUserViewManager.GetUserViews -> Folder[]", "implementation method not found"));
+            }
+
+            if (_ensureLibraryFolder == null)
+            {
+                Plugin.Instance.Logger.Info(
+                    "NoBoxsetsAutoCreation - EnsureLibraryFolder absent; user-view filter active");
             }
         }
 
         protected override void Prepare(bool apply)
         {
-            PatchUnpatch(PatchTracker, apply, _ensureLibraryFolder, prefix: nameof(EnsureLibraryFolderPrefix));
-            PatchUnpatch(PatchTracker, apply, _getUserViews, prefix: nameof(GetUserViewsPrefix));
+            if (_ensureLibraryFolder != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _ensureLibraryFolder, prefix: nameof(EnsureLibraryFolderPrefix));
+            }
+
+            foreach (var target in _getUserViewsTargets)
+            {
+                PatchUnpatch(PatchTracker, apply, target, postfix: nameof(GetUserViewsPostfix));
+            }
         }
 
         [HarmonyPrefix]
@@ -65,15 +89,6 @@ namespace StrmAssistant.Mod
         /// 在 Harmony 中，如果不确定参数是否存在，不要将其写在方法签名里。
         /// 如果需要 User，可以通过 __args 或手动从 query 获取。
         /// </summary>
-        [HarmonyPrefix]
-        private static bool GetUserViewsPrefix(UserViewQuery query)
-        {
-            // 4.9 版本中这个方法不再通过参数传递 User
-            // 我们保留此 Prefix 主要是为了拦截并修改 query（如果需要）
-            // 或者配合 Postfix 过滤结果。
-            return true;
-        }
-
         /// <summary>
         /// 使用 Postfix 来过滤返回的 folders 列表，移除合集库。
         /// </summary>

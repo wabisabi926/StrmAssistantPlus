@@ -40,9 +40,12 @@ namespace StrmAssistant.Mod
 
         public ChineseMovieDb()
         {
+            var enabled = Plugin.Instance.MetadataEnhanceStore.GetOptions().ChineseMetadata.ChineseMovieDb;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
             PatchCacheTime();
-            if (Plugin.Instance.MetadataEnhanceStore.GetOptions().ChineseMetadata.ChineseMovieDb) Patch();
+            if (enabled) Patch();
         }
 
         protected override void OnInitialize()
@@ -63,8 +66,9 @@ namespace StrmAssistant.Mod
             _getImageLanguagesParam = movieDbProviderBase?.GetMethod("GetImageLanguagesParam", BindingFlags.NonPublic | BindingFlags.Instance, null, new[] { typeof(string[]) }, null);
             _cacheTime = movieDbProviderBase?.GetField("CacheTime", BindingFlags.Public | BindingFlags.Static);
 
+            _movieGetMetadata = MovieDbTargets.ResolveGetMetadata(_movieDbAssembly,
+                "MovieDb.MovieDbProvider", typeof(MovieInfo));
             var movieDbProvider = _movieDbAssembly.GetType("MovieDb.MovieDbProvider");
-            _movieGetMetadata = movieDbProvider?.GetMethod("GetMetadata");
             var completeMovieData = movieDbProvider?.GetNestedType("CompleteMovieData", BindingFlags.NonPublic);
             _getTitleMovieData = completeMovieData?.GetMethod("GetTitle");
             if (_getTitleMovieData != null) ReversePatch(PatchTracker, _getTitleMovieData, nameof(MovieGetTitleStub));

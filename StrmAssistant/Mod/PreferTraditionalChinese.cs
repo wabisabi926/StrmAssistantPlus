@@ -23,9 +23,12 @@ namespace StrmAssistant.Mod
 
         public PreferTraditionalChinese()
         {
+            var enabled = Plugin.Instance.MetadataEnhanceStore.GetOptions().ChineseMetadata.PreferTraditionalChinese;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.MetadataEnhanceStore.GetOptions().ChineseMetadata.PreferTraditionalChinese)
+            if (enabled)
             {
                 Patch();
             }
@@ -37,8 +40,10 @@ namespace StrmAssistant.Mod
                 .FirstOrDefault(a => a.GetName().Name == "MovieDb");
             if (movieDbAssembly == null) return;
 
-            _movieGetMetadata = movieDbAssembly.GetType("MovieDb.MovieDbProvider")?.GetMethod("GetMetadata");
-            _seriesGetMetadata = movieDbAssembly.GetType("MovieDb.MovieDbSeriesProvider")?.GetMethod("GetMetadata");
+            _movieGetMetadata = Require(MovieDbTargets.ResolveGetMetadataTarget(movieDbAssembly,
+                "MovieDb.MovieDbProvider", typeof(MovieInfo))).Method;
+            _seriesGetMetadata = Require(MovieDbTargets.ResolveGetMetadataTarget(movieDbAssembly,
+                "MovieDb.MovieDbSeriesProvider", typeof(SeriesInfo))).Method;
 
             if (Plugin.Instance.DebugMode)
             {

@@ -1,7 +1,9 @@
 ﻿using HarmonyLib;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Persistence;
 using SQLitePCL.pretty;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -26,6 +28,7 @@ namespace StrmAssistant.Mod
         private static MethodInfo sqlite3_enable_load_extension;
         private static FieldInfo sqlite3_db;
         private static MethodInfo _createConnection;
+        private static readonly List<MethodInfo> _createConnections = new List<MethodInfo>();
         private static MethodInfo _createConnectionManager;
         private static FieldInfo _managerId;
         private static PropertyInfo _dbFilePath;
@@ -45,6 +48,8 @@ namespace StrmAssistant.Mod
         private static MethodInfo _createSearchTerm;
         private static MethodInfo _cacheIdsFromTextParams;
         private static bool _getJoinCommandTextReturnsStringBuilder;
+        private static bool _getJoinCommandTextUsesPositional;
+        private static bool _cacheIdsFromTextParamsUsesPositional;
 
         public static string CurrentTokenizerName { get; private set; } = "unknown";
 
@@ -337,6 +342,9 @@ namespace StrmAssistant.Mod
         public EnhanceChineseSearch()
         {
             _tokenizerPath = Path.Combine(Plugin.Instance.ApplicationPaths.PluginsPath, "libsimple.so");
+            PatchTracker.IsFeatureEnabled =
+                Plugin.Instance.MainOptionsStore.GetOptions().ChineseSearch.EnhanceChineseSearch;
+
 
             Initialize();
 
@@ -381,6 +389,9 @@ namespace StrmAssistant.Mod
                             })
                             .ToArray();
                         
+                        _createConnections.Clear();
+                        _createConnections.AddRange(createConnectionMethods);
+
                         if (createConnectionMethods.Length == 1)
                         {
                             _createConnection = createConnectionMethods[0];
@@ -404,63 +415,109 @@ namespace StrmAssistant.Mod
                             BindingFlags.NonPublic | BindingFlags.Instance);
                     }
 
-                    // 连接管理器：所有连接（读+写）的唯一出口，override 虚方法不可内联。
-                    // 前置重载（CreateConnection() / (bool)）是一行转发，会被 JIT 内联 → 打在那上面覆盖不到写路径。
-                    var connectionManager = EmbyVersionCompatibility.TryGetType(embySqlite, "Emby.Sqlite.PooledDatabaseConnectionManager");
-                    if (connectionManager != null)
+                    // 连接管理器：4.11 的 PooledDatabaseConnectionManager 名称已消失，
+                    // 具体实现是 Emby.Sqlite 里继承 DatabaseConnectionManager 的混淆类型。
+                    // 直接取仓库实例的 ConnectionManager 具体类型；4.11 的实现类型名被混淆。
+                    var repositoryInstance = BaseItem.ItemRepository;
+                    var baseRepoType = embySqlite.GetType("Emby.Sqlite.BaseSqliteRepository");
+                    var managerProperty = baseRepoType?.GetProperty("ConnectionManager",
+                        BindingFlags.Public | BindingFlags.Instance);
+                    var managerInstance = managerProperty?.GetValue(repositoryInstance);
+                    var managerImpl = managerInstance?.GetType();
+
+                    var connectionManagerBase = embySqlite.GetType("Emby.Sqlite.DatabaseConnectionManager");
+                    if (managerImpl == null && connectionManagerBase != null)
                     {
-                        _createConnectionManager = connectionManager.GetMethod("CreateConnection",
-                            BindingFlags.Public | BindingFlags.Instance, null,
-                            new[] { typeof(bool), typeof(CancellationToken) }, null);
-                        _managerId = connectionManager.GetField("Id", BindingFlags.NonPublic | BindingFlags.Instance);
+                        managerImpl = AppDomain.CurrentDomain.GetAssemblies()
+                            .SelectMany(EmbyTargetResolver.GetLoadableTypes)
+                            .FirstOrDefault(t => t != null && !t.IsAbstract && !t.IsInterface &&
+                                                 !t.ContainsGenericParameters &&
+                                                 t != connectionManagerBase &&
+                                                 connectionManagerBase.IsAssignableFrom(t));
                     }
+
+                    if (managerImpl != null)
+                    {
+                        // 具体 override 的方法名也可能被混淆；按签名在具体类型上选非抽象方法。
+                        _createConnectionManager = managerImpl
+                            .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                            .FirstOrDefault(m =>
+                            {
+                                if (m.IsAbstract || m.DeclaringType != managerImpl) return false;
+                                if (m.ReturnType != typeof(IDatabaseConnection)) return false;
+                                var ps = m.GetParameters();
+                                return ps.Length == 2 && ps[0].ParameterType == typeof(bool) &&
+                                       ps[1].ParameterType == typeof(CancellationToken);
+                            });
+
+                        _managerId = managerImpl.GetField("Id",
+                            BindingFlags.NonPublic | BindingFlags.Instance);
+                    }
+
+
                 }
 
                 // 加载 Emby.Server.Implementations
                 var embyServerImplementationsAssembly = EmbyVersionCompatibility.TryLoadAssembly("Emby.Server.Implementations");
                 if (embyServerImplementationsAssembly != null)
                 {
-                    var sqliteItemRepository = EmbyVersionCompatibility.TryGetType(
-                        embyServerImplementationsAssembly, 
-                        "Emby.Server.Implementations.Data.SqliteItemRepository");
-                    
+                    // 4.11 的 SqliteItemRepository 类型名被混淆；从已注入的 IItemRepository 实例取具体类型。
+                    var sqliteItemRepository = EmbyTargetResolver.GetImplementationType(BaseItem.ItemRepository) ??
+                                               EmbyTargetResolver.FindImplementationType(
+                                                   embyServerImplementationsAssembly, typeof(IItemRepository));
+
                     if (sqliteItemRepository != null)
                     {
-                        // 处理 GetJoinCommandText 可能的重载
-                        var sqliteItemRepositoryType = sqliteItemRepository;
-                        _getJoinCommandText = EmbyVersionCompatibility.FindCompatibleMethod(
-                            sqliteItemRepositoryType, 
-                            "GetJoinCommandText", 
-                            BindingFlags.NonPublic | BindingFlags.Instance,
-                            // Emby 4.9.1.x 及以上版本，移除了 itemLinks2TableQualifier 参数
-                            new[] { typeof(MediaBrowser.Controller.Entities.InternalItemsQuery), typeof(List<KeyValuePair<string, string>>), typeof(string), typeof(bool) },
-                            // Emby 4.9.0.x 版本
-                            new[] { typeof(MediaBrowser.Controller.Entities.InternalItemsQuery), typeof(List<KeyValuePair<string, string>>), typeof(string), typeof(string), typeof(bool) }
-                        );
+                        _getJoinCommandText = Require(ResolveJoinCommandText(sqliteItemRepository)).Method;
 
                         if (_getJoinCommandText != null)
                         {
-                            if (Plugin.Instance.DebugMode)
-                            {
-                                var paramCount = _getJoinCommandText.GetParameters().Length;
-                                Plugin.Instance.Logger.Debug($"EnhanceChineseSearch: Selected GetJoinCommandText with {paramCount} parameters");
-                            }
-
-                            // 检查返回类型
+                            var paramCount = _getJoinCommandText.GetParameters().Length;
                             var returnType = _getJoinCommandText.ReturnType;
                             _getJoinCommandTextReturnsStringBuilder = returnType.Name == "StringBuilder" ||
                                 returnType.FullName == "System.Text.StringBuilder";
-                            
+                            _getJoinCommandTextUsesPositional = _getJoinCommandText.GetParameters()
+                                .Any(p => string.IsNullOrEmpty(p.Name));
+
                             if (Plugin.Instance.DebugMode)
                             {
-                                Plugin.Instance.Logger.Debug($"EnhanceChineseSearch: GetJoinCommandText returns {returnType.Name}");
+                                Plugin.Instance.Logger.Debug(
+                                    $"EnhanceChineseSearch: Selected GetJoinCommandText with {paramCount} parameters, returns {returnType.Name}, positional={_getJoinCommandTextUsesPositional}");
                             }
                         }
-                        
-                        _createSearchTerm = sqliteItemRepository.GetMethod("CreateSearchTerm", 
-                            BindingFlags.NonPublic | BindingFlags.Static);
-                        _cacheIdsFromTextParams = sqliteItemRepository.GetMethod("CacheIdsFromTextParams",
-                            BindingFlags.Instance | BindingFlags.NonPublic);
+
+                        var cacheIds = Require(EmbyTargetResolver.ResolveByNameOrSignature(sqliteItemRepository,
+                            "CacheIdsFromTextParams",
+                            new[] { typeof(InternalItemsQuery), typeof(IDatabaseConnection) },
+                            typeof(void), false));
+                        _cacheIdsFromTextParams = cacheIds.Method;
+                        _cacheIdsFromTextParamsUsesPositional = _cacheIdsFromTextParams != null &&
+                            _cacheIdsFromTextParams.GetParameters().Any(p => string.IsNullOrEmpty(p.Name));
+
+                        if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_10)
+                        {
+                            _createSearchTerm = EmbyTargetResolver.ResolveByNameOrSignature(sqliteItemRepository,
+                                "CreateSearchTerm",
+                                new[] { typeof(string), typeof(bool) },
+                                typeof(string), true).Method;
+
+                            if (_createSearchTerm != null)
+                            {
+                                Plugin.Instance.Logger.Info(
+                                    "EnhanceChineseSearch: CreateSearchTerm overload resolved; query normalization uses join bind params");
+                            }
+                        }
+                        else
+                        {
+                            _createSearchTerm = EmbyTargetResolver.ResolveByName(sqliteItemRepository,
+                                "CreateSearchTerm", new[] { typeof(string) }, typeof(string), true).Method;
+                        }
+
+                        if (_createSearchTerm == null && EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_10)
+                        {
+                            Plugin.Instance.Logger.Info(
+                                "EnhanceChineseSearch: CreateSearchTerm not found; search-term normalization will rely on join bind params");
+                        }
                     }
                 }
 
@@ -472,7 +529,11 @@ namespace StrmAssistant.Mod
                 if (_createConnection == null) missingComponents.Add("CreateConnection");
                 if (_dbFilePath == null) missingComponents.Add("DbFilePath");
                 if (_getJoinCommandText == null) missingComponents.Add("GetJoinCommandText");
-                if (_createSearchTerm == null) missingComponents.Add("CreateSearchTerm");
+                if (_createSearchTerm == null &&
+                    EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_10)
+                {
+                    missingComponents.Add("CreateSearchTerm");
+                }
                 if (_cacheIdsFromTextParams == null) missingComponents.Add("CacheIdsFromTextParams");
 
                 if (missingComponents.Any())
@@ -533,9 +594,13 @@ namespace StrmAssistant.Mod
                 return;
             }
 
-            // 双补丁：仓库侧（能拿到 DbFilePath，用于定位 library.db）+ 管理器侧（覆盖全部连接路径）。
-            var patchedRepository = PatchUnpatch(Instance.PatchTracker, true, _createConnection,
-                postfix: nameof(CreateConnectionPostfix));
+            // 关闭 DTO 批量补丁后，0/1/2 参 CreateConnection 全挂已不再导致 Items 卡死（隔离实例实测）。
+            var patchedRepository = false;
+            foreach (var createConnection in _createConnections)
+            {
+                patchedRepository |= PatchUnpatch(Instance.PatchTracker, true, createConnection,
+                    postfix: nameof(CreateConnectionPostfix));
+            }
 
             var patchedManager = _createConnectionManager != null &&
                                  PatchUnpatch(Instance.PatchTracker, true, _createConnectionManager,
@@ -715,6 +780,16 @@ namespace StrmAssistant.Mod
                         var hasScheduledRebuild = HasScheduledRebuild();
                         var tokenizerIsSimple = string.Equals(CurrentTokenizerName, "simple", StringComparison.Ordinal);
 
+                        if (tokenizerIsSimple &&
+                            EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11 &&
+                            !FtsHasItemIdColumn(connection, ftsTableName))
+                        {
+                            tokenizerIsSimple = false;
+                            ScheduleRebuildOnNextRestart();
+                            Plugin.Instance.Logger.Warn(
+                                "EnhanceChineseSearch: FTS index lacks ItemId column; rebuilding for Emby 4.11");
+                        }
+
                         Plugin.Instance.Logger.Info(
                             $"EnhanceChineseSearch - Phase2 state: tokenizer='{CurrentTokenizerName}', scheduledRebuild={hasScheduledRebuild}");
 
@@ -825,10 +900,18 @@ namespace StrmAssistant.Mod
 
         private static bool RebuildFts(IDatabaseConnection connection, string ftsTableName, string tokenizerName)
         {
-            string populateQuery;
+            // 4.11 的 FTS 表新增 ItemId 列；遗漏会导致 Emby 搜索读取 ItemId 时空引用（HTTP 500）。
+            var includesItemId = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11;
+            var ftsColumns = includesItemId
+                ? "ItemId, Name, OriginalTitle, SeriesName, Album"
+                : "Name, OriginalTitle, SeriesName, Album";
+            var populateColumns = includesItemId
+                ? "(RowId, ItemId, Name, OriginalTitle, SeriesName, Album)"
+                : "(RowId, Name, OriginalTitle, SeriesName, Album)";
+            var populateIds = includesItemId ? "id, id, " : "id, ";
 
-            populateQuery =
-                $"insert into {ftsTableName}(RowId, Name, OriginalTitle, SeriesName, Album) select id, " +
+            var populateQuery =
+                $"insert into {ftsTableName}{populateColumns} select {populateIds}" +
                 GetSearchColumnNormalization("Name") + ", " +
                 GetSearchColumnNormalization("OriginalTitle") + ", " +
                 GetSearchColumnNormalization("SeriesName") + ", " +
@@ -848,7 +931,7 @@ namespace StrmAssistant.Mod
                 connection.Execute(dropFtsTableQuery);
 
                 var createFtsTableQuery =
-                    $"CREATE VIRTUAL TABLE IF NOT EXISTS {ftsTableName} USING FTS5 (Name, OriginalTitle, SeriesName, Album, tokenize=\"{tokenizerName}\", prefix='1 2 3 4')";
+                    $"CREATE VIRTUAL TABLE IF NOT EXISTS {ftsTableName} USING FTS5 ({ftsColumns}, tokenize=\"{tokenizerName}\", prefix='1 2 3 4')";
                 connection.Execute(createFtsTableQuery);
 
                 Plugin.Instance.Logger.Info($"EnhanceChineseSearch - Filling {ftsTableName} Start");
@@ -1353,17 +1436,140 @@ namespace StrmAssistant.Mod
 
         private static bool PatchSearchFunctions()
         {
-            // 根据返回类型选择正确的 Postfix 方法
-            string getJoinCommandTextPostfix = _getJoinCommandTextReturnsStringBuilder 
-                ? nameof(GetJoinCommandTextPostfixStringBuilder) 
-                : nameof(GetJoinCommandTextPostfix);
-            
-            return PatchUnpatch(Instance.PatchTracker, true, _getJoinCommandText,
-                       postfix: getJoinCommandTextPostfix) &&
-                   PatchUnpatch(Instance.PatchTracker, true, _createSearchTerm,
-                       prefix: nameof(CreateSearchTermPrefix)) &&
-                   PatchUnpatch(Instance.PatchTracker, true,
-                       _cacheIdsFromTextParams, prefix: nameof(CacheIdsFromTextParamsPrefix));
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_10)
+            {
+                // Emby 先构造原生 FTS 表达式；join postfix 将简单词交给 simple_query，
+                // 并清理绑定值中的 FTS 包装，保留多词与前缀语义。
+                var modernJoinPostfix = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11
+                    ? (_getJoinCommandTextUsesPositional
+                        ? nameof(GetJoinCommandTextPostfix411)
+                        : nameof(GetJoinCommandTextPostfixStringBuilder))
+                    : nameof(GetJoinCommandTextPostfix410);
+                var modernJoinPatched = PatchUnpatch(Instance.PatchTracker, true, _getJoinCommandText,
+                    postfix: modernJoinPostfix);
+
+                var modernCachePatched = true;
+                if (EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11 &&
+                    !_cacheIdsFromTextParamsUsesPositional)
+                {
+                    modernCachePatched = PatchUnpatch(Instance.PatchTracker, true,
+                        _cacheIdsFromTextParams, prefix: nameof(CacheIdsFromTextParamsPrefix));
+                }
+
+                Plugin.Instance.Logger.Info(
+                    "EnhanceChineseSearch - join SQL rewrite active (FTS bound term normalization)");
+                return modernJoinPatched && modernCachePatched;
+            }
+
+            var joinPostfix = _getJoinCommandTextUsesPositional
+                ? nameof(GetJoinCommandTextPostfix411)
+                : _getJoinCommandTextReturnsStringBuilder
+                    ? nameof(GetJoinCommandTextPostfixStringBuilder)
+                    : nameof(GetJoinCommandTextPostfix);
+
+            var joinPatched = PatchUnpatch(Instance.PatchTracker, true, _getJoinCommandText,
+                postfix: joinPostfix);
+
+            var cachePrefix = _cacheIdsFromTextParamsUsesPositional
+                ? nameof(CacheIdsFromTextParamsPrefix411)
+                : nameof(CacheIdsFromTextParamsPrefix);
+
+            var cachePatched = true;
+            if (_cacheIdsFromTextParamsUsesPositional)
+            {
+                // 4.11 的 CacheIdsFromTextParams 参数名被剥离；先不挂，避免改变 query 状态导致 GetJoin NRE。
+                Plugin.Instance.Logger.Info(
+                    "EnhanceChineseSearch: CacheIdsFromTextParams patch skipped on this Emby build (positional/obfuscated)");
+            }
+            else
+            {
+                cachePatched = PatchUnpatch(Instance.PatchTracker, true,
+                    _cacheIdsFromTextParams, prefix: cachePrefix);
+            }
+
+            var searchTermPatched = true;
+            if (_createSearchTerm != null)
+            {
+                searchTermPatched = PatchUnpatch(Instance.PatchTracker, true, _createSearchTerm,
+                    prefix: nameof(CreateSearchTermPrefix));
+            }
+
+            return joinPatched && cachePatched && searchTermPatched;
+        }
+
+        private static TargetResolution ResolveJoinCommandText(Type repositoryType)
+        {
+            var variants = new[]
+            {
+                // Emby 4.9.1.x 及以上版本，移除了 itemLinks2TableQualifier 参数
+                new[]
+                {
+                    typeof(InternalItemsQuery), typeof(List<KeyValuePair<string, string>>), typeof(string),
+                    typeof(bool)
+                },
+                // Emby 4.9.0.x 版本
+                new[]
+                {
+                    typeof(InternalItemsQuery), typeof(List<KeyValuePair<string, string>>), typeof(string),
+                    typeof(string), typeof(bool)
+                }
+            };
+
+            // 4.11 存在同参数但返回 List<string> 的其它方法，必须限定 SQL 文本返回类型。
+            var returnTypes = new[] { typeof(string), typeof(System.Text.StringBuilder) };
+
+            foreach (var parameters in variants)
+            {
+                foreach (var returnType in returnTypes)
+                {
+                    var byName = EmbyTargetResolver.ResolveByName(repositoryType, "GetJoinCommandText",
+                        parameters, returnType);
+                    if (byName.IsFound) return byName;
+                }
+            }
+
+            foreach (var parameters in variants)
+            {
+                foreach (var returnType in returnTypes)
+                {
+                    var bySignature = EmbyTargetResolver.ResolveBySignature(repositoryType, parameters,
+                        returnType);
+                    if (bySignature.IsFound) return bySignature;
+                }
+            }
+
+            // 4.11 的 3 参转发重载；若 5 参实现没找到，至少挂它能覆盖内部调用。
+            var fallback = EmbyTargetResolver.ResolveBySignature(repositoryType, new[]
+            {
+                typeof(InternalItemsQuery), typeof(List<KeyValuePair<string, string>>), typeof(string)
+            }, typeof(System.Text.StringBuilder));
+
+            return fallback.IsFound
+                ? fallback
+                : TargetResolution.Missing("IItemRepository.GetJoinCommandText(...)",
+                    "no matching overload found");
+        }
+
+        private static bool FtsHasItemIdColumn(IDatabaseConnection connection, string ftsTableName)
+        {
+            try
+            {
+                using (var statement = connection.PrepareStatement(
+                           $"SELECT sql FROM sqlite_master WHERE type='table' AND name='{ftsTableName}'"))
+                {
+                    if (statement.MoveNext())
+                    {
+                        var sql = statement.Current?.GetString(0);
+                        return sql != null && sql.IndexOf("ItemId", StringComparison.OrdinalIgnoreCase) >= 0;
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Warn("EnhanceChineseSearch - FTS schema check failed: " + e.Message);
+            }
+
+            return false;
         }
 
         private static bool HasTokenizerOnConnection(IDatabaseConnection connection)
@@ -1501,6 +1707,8 @@ namespace StrmAssistant.Mod
         [HarmonyPostfix]
         private static void CreateConnectionPostfix(object __instance, ref IDatabaseConnection __result)
         {
+            if (__result == null) return;
+
             // Tokenizers are registered per SQLite handle; only phase 2 is once-per-process.
             lock (_lock)
             {
@@ -1665,6 +1873,46 @@ namespace StrmAssistant.Mod
             List<KeyValuePair<string, string>> bindParams, string mediaItemsTableQualifier,
             bool allowJoinOnItemLinks, System.Text.StringBuilder __result)
         {
+            ApplyJoinCommandTextStringBuilder(query, bindParams, __result);
+        }
+
+        [HarmonyPostfix]
+        private static void GetJoinCommandTextPostfix410(object __0, object __1,
+            System.Text.StringBuilder __result)
+        {
+            if (__0 is InternalItemsQuery query &&
+                __1 is List<KeyValuePair<string, string>> bindParams)
+            {
+                ApplyJoinCommandTextStringBuilder(query, bindParams, __result);
+            }
+        }
+
+        private static bool _loggedJoin411Sample;
+
+        [HarmonyPostfix]
+        private static void GetJoinCommandTextPostfix411(InternalItemsQuery __0,
+            List<KeyValuePair<string, string>> __1, System.Text.StringBuilder __result)
+        {
+            try
+            {
+                if (!_loggedJoin411Sample && __result != null)
+                {
+                    _loggedJoin411Sample = true;
+                    Plugin.Instance.Logger.Info("EnhanceChineseSearch - join sql sample: " +
+                        (__result.Length > 400 ? __result.ToString(0, 400) : __result.ToString()));
+                }
+
+                ApplyJoinCommandTextStringBuilder(__0, __1, __result);
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Warn("EnhanceChineseSearch - GetJoinCommandText postfix failed: " + e);
+            }
+        }
+
+        private static void ApplyJoinCommandTextStringBuilder(InternalItemsQuery query,
+            List<KeyValuePair<string, string>> bindParams, System.Text.StringBuilder __result)
+        {
             if (__result == null) return;
 
             var resultString = __result.ToString();
@@ -1720,9 +1968,23 @@ namespace StrmAssistant.Mod
                         .Replace("'", string.Empty);
                 }
 
+                if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_10)
+                {
+                    // Emby 传给 fts match 的是 FTS 表达式（如 "多段300"*）；
+                    // simple_query 需要原始文本，否则会生成错误 token。
+                    currentValue = StripFtsExpressionWrappers(currentValue);
+                }
+
                 bindParams[i] = new KeyValuePair<string, string>(bindParams[i].Key, NormalizeQueryTerm(currentValue));
             }
         }
+
+        internal static string StripFtsExpressionWrappers(string value) =>
+            value?.Replace("\"", string.Empty)
+                .Replace("*", string.Empty)
+                .Replace("^", string.Empty)
+                .Replace("$", string.Empty)
+                .Trim();
 
         [HarmonyPrefix]
         private static bool CreateSearchTermPrefix(string searchTerm, ref string __result)
@@ -1734,6 +1996,19 @@ namespace StrmAssistant.Mod
 
         [HarmonyPrefix]
         private static bool CacheIdsFromTextParamsPrefix(InternalItemsQuery query, IDatabaseConnection db)
+        {
+            CacheIdsFromTextParamsCore(query, db);
+            return true;
+        }
+
+        [HarmonyPrefix]
+        private static bool CacheIdsFromTextParamsPrefix411(InternalItemsQuery __0, IDatabaseConnection __1)
+        {
+            CacheIdsFromTextParamsCore(__0, __1);
+            return true;
+        }
+
+        private static void CacheIdsFromTextParamsCore(InternalItemsQuery query, IDatabaseConnection db)
         {
             if ((query.PersonTypes?.Length ?? 0) == 0)
             {
@@ -1790,8 +2065,6 @@ namespace StrmAssistant.Mod
                     var result = LoadTokenizerExtension(db);
                 }
             }
-
-            return true;
         }
     }
 }

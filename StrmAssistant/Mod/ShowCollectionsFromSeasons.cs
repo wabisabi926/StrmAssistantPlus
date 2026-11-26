@@ -2,6 +2,7 @@
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Library;
+using StrmAssistant.Core;
 using StrmAssistant.Options;
 using System;
 using System.Linq;
@@ -31,9 +32,12 @@ namespace StrmAssistant.Mod
 
         public ShowCollectionsFromSeasons()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().ItemDisplay.ShowCollectionsFromSeasons;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().ItemDisplay.ShowCollectionsFromSeasons)
+            if (enabled)
             {
                 Patch();
             }
@@ -47,9 +51,14 @@ namespace StrmAssistant.Mod
                 _getItemsRequestType = embyApi.GetType("Emby.Api.UserLibrary.GetItems");
 
                 var itemsService = embyApi.GetType("Emby.Api.UserLibrary.ItemsService");
-                _getQueryResult = itemsService?
-                    .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
-                    .FirstOrDefault(m => m.Name == "GetQueryResult");
+                _getQueryResult = Require(EmbyTargetResolver.ResolveByNameOrSignature(itemsService,
+                    "GetQueryResult",
+                    new[]
+                    {
+                        _getItemsRequestType, typeof(MediaBrowser.Controller.Dto.DtoOptions),
+                        typeof(MediaBrowser.Controller.Entities.User), typeof(MediaBrowser.Model.Data.IDataContext),
+                        typeof(System.Threading.CancellationToken)
+                    })).Method;
 
                 if (Plugin.Instance.DebugMode)
                 {
@@ -76,12 +85,28 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPrefix]
-        private static void GetQueryResultPrefix(object request, object user)
+        private static void GetQueryResultPrefix(object[] __args)
         {
             try
             {
-                if (request == null || _getItemsRequestType == null) return;
-                if (!_getItemsRequestType.IsInstanceOfType(request)) return;
+                if (_getItemsRequestType == null || __args == null) return;
+
+                object request = null;
+                object user = null;
+
+                foreach (var arg in __args)
+                {
+                    if (request == null && _getItemsRequestType.IsInstanceOfType(arg))
+                    {
+                        request = arg;
+                    }
+                    else if (user == null && arg is MediaBrowser.Controller.Entities.User foundUser)
+                    {
+                        user = foundUser;
+                    }
+                }
+
+                if (request == null) return;
 
                 var reqType = request.GetType();
 

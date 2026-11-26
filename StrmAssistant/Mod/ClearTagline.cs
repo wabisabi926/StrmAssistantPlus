@@ -3,6 +3,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Providers;
+using StrmAssistant.Common;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,9 +22,12 @@ namespace StrmAssistant.Mod
 
         public ClearTagline()
         {
+            var enabled = Plugin.Instance.MetadataEnhanceStore.GetOptions().PosterSort.ClearTagline;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.MetadataEnhanceStore.GetOptions().PosterSort.ClearTagline)
+            if (enabled)
             {
                 Patch();
             }
@@ -35,8 +39,10 @@ namespace StrmAssistant.Mod
                 .FirstOrDefault(a => a.GetName().Name == "MovieDb");
             if (movieDbAssembly == null) return;
 
-            _movieGetMetadata = movieDbAssembly.GetType("MovieDb.MovieDbProvider")?.GetMethod("GetMetadata");
-            _seriesGetMetadata = movieDbAssembly.GetType("MovieDb.MovieDbSeriesProvider")?.GetMethod("GetMetadata");
+            _movieGetMetadata = Require(MovieDbTargets.ResolveGetMetadataTarget(movieDbAssembly,
+                "MovieDb.MovieDbProvider", typeof(MovieInfo))).Method;
+            _seriesGetMetadata = Require(MovieDbTargets.ResolveGetMetadataTarget(movieDbAssembly,
+                "MovieDb.MovieDbSeriesProvider", typeof(SeriesInfo))).Method;
 
             if (Plugin.Instance.DebugMode)
             {

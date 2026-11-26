@@ -5,6 +5,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
+using StrmAssistant.Common;
 using StrmAssistant.Core;
 using StrmAssistant.Provider;
 using System;
@@ -55,9 +56,12 @@ namespace StrmAssistant.Mod
 
         public MovieDbEpisodeGroup()
         {
+            var enabled = Plugin.Instance.MetadataEnhanceStore.GetOptions().EpisodeGroup.MovieDbEpisodeGroup;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.MetadataEnhanceStore.GetOptions().EpisodeGroup.MovieDbEpisodeGroup)
+            if (enabled)
             {
                 Patch();
             }
@@ -71,31 +75,37 @@ namespace StrmAssistant.Mod
 
             if (_movieDbAssembly != null)
             {
-                var movieDbSeriesProvider = _movieDbAssembly.GetType("MovieDb.MovieDbSeriesProvider");
-                _seriesGetMetadata =
-                    movieDbSeriesProvider.GetMethod("GetMetadata", BindingFlags.Public | BindingFlags.Instance);
+                _seriesGetMetadata = Require(MovieDbTargets.ResolveGetMetadataTarget(_movieDbAssembly,
+                    "MovieDb.MovieDbSeriesProvider", typeof(SeriesInfo))).Method;
                 var movieDbSeasonProvider = _movieDbAssembly.GetType("MovieDb.MovieDbSeasonProvider");
-                _seasonGetMetadata = movieDbSeasonProvider.GetMethod("GetMetadata",
-                    BindingFlags.Public | BindingFlags.Instance, null,
-                    new[] { typeof(RemoteMetadataFetchOptions<SeasonInfo>), typeof(CancellationToken) }, null);
+                _seasonGetMetadata = Require(EmbyTargetResolver.ResolveByName(movieDbSeasonProvider,
+                    "GetMetadata",
+                    new[] { typeof(RemoteMetadataFetchOptions<SeasonInfo>), typeof(CancellationToken) })).Method;
                 var movieDbEpisodeProvider = _movieDbAssembly.GetType("MovieDb.MovieDbEpisodeProvider");
-                _episodeGetMetadata = movieDbEpisodeProvider.GetMethod("GetMetadata",
-                    BindingFlags.Public | BindingFlags.Instance, null,
-                    new[] { typeof(RemoteMetadataFetchOptions<EpisodeInfo>), typeof(CancellationToken) }, null);
+                _episodeGetMetadata = Require(EmbyTargetResolver.ResolveByName(movieDbEpisodeProvider,
+                    "GetMetadata",
+                    new[] { typeof(RemoteMetadataFetchOptions<EpisodeInfo>), typeof(CancellationToken) })).Method;
 
                 var movieDbSeasonImageProvider = _movieDbAssembly.GetType("MovieDb.MovieDbSeasonImageProvider");
-                _seasonGetImages = movieDbSeasonImageProvider.GetMethod("GetImages",
-                    BindingFlags.Public | BindingFlags.Instance, null,
-                    new[] { typeof(RemoteImageFetchOptions), typeof(CancellationToken) }, null);
+                _seasonGetImages = Require(EmbyTargetResolver.ResolveByName(movieDbSeasonImageProvider,
+                    "GetImages", new[] { typeof(RemoteImageFetchOptions), typeof(CancellationToken) })).Method;
                 var movieDbEpisodeImageProvider = _movieDbAssembly.GetType("MovieDb.MovieDbEpisodeImageProvider");
-                _episodeGetImages = movieDbEpisodeImageProvider.GetMethod("GetImages",
-                    BindingFlags.Public | BindingFlags.Instance, null,
-                    new[] { typeof(RemoteImageFetchOptions), typeof(CancellationToken) }, null);
+                _episodeGetImages = Require(EmbyTargetResolver.ResolveByName(movieDbEpisodeImageProvider,
+                    "GetImages", new[] { typeof(RemoteImageFetchOptions), typeof(CancellationToken) })).Method;
 
                 var embyProviders = Assembly.Load("Emby.Providers");
                 var providerManager = embyProviders.GetType("Emby.Providers.Manager.ProviderManager");
-                _canRefreshMetadata =
-                    providerManager.GetMethod("CanRefresh", BindingFlags.Static | BindingFlags.NonPublic);
+
+                // 4.11 的 CanRefresh 在泛型 IMetadataService 实现上，Harmony 不能直接 patch 开放泛型；
+                // 改挂 public RefreshSingleItem（含 item/options，且在 provider 执行前），语义更完整。
+                _canRefreshMetadata = Require(EmbyTargetResolver.ResolveByName(providerManager,
+                    "RefreshSingleItem",
+                    new[]
+                    {
+                        typeof(BaseItem), typeof(MediaBrowser.Controller.Providers.MetadataRefreshOptions),
+                        typeof(BaseItem[]), typeof(LibraryOptions),
+                        typeof(System.Threading.CancellationToken)
+                    })).Method;
             }
             else
             {
@@ -117,40 +127,38 @@ namespace StrmAssistant.Mod
                 postfix: nameof(SeasonGetImagesPostfix));
             PatchUnpatch(PatchTracker, apply, _episodeGetImages, prefix: nameof(EpisodeGetImagesPrefix),
                 postfix: nameof(EpisodeGetImagesPostfix));
-            PatchUnpatch(PatchTracker, apply, _canRefreshMetadata, prefix: nameof(CanRefreshMetadataPrefix));
+            PatchUnpatch(PatchTracker, apply, _canRefreshMetadata,
+                prefix: nameof(RefreshSingleItemPrefix));
         }
 
         [HarmonyPrefix]
-        private static void CanRefreshMetadataPrefix(IMetadataProvider provider, BaseItem item,
-            LibraryOptions libraryOptions, bool includeDisabled, bool forceEnableInternetMetadata,
-            bool ignoreMetadataLock)
+        private static void RefreshSingleItemPrefix(BaseItem item)
         {
-            if (CurrentSeries.Value != null) return;
-
+            if (item == null) return;
             if (item.Parent is null && item.ExtraType is null) return;
 
-            if (provider is IRemoteMetadataProvider && provider.Name == "TheMovieDb" &&
-                Plugin.Instance.MetadataEnhanceStore.GetOptions().EpisodeGroup.LocalEpisodeGroup)
+            if (!Plugin.Instance.MetadataEnhanceStore.GetOptions().EpisodeGroup.LocalEpisodeGroup)
             {
-                var providerName = provider.GetType().FullName;
+                CurrentSeries.Value = null;
+                return;
+            }
 
-                if (item is Episode episode && providerName == "MovieDb.MovieDbEpisodeProvider")
-                {
-                    CurrentSeries.Value = episode.Series;
-                }
-                else if (item is Season season && providerName == "MovieDb.MovieDbSeasonProvider")
-                {
-                    CurrentSeries.Value = season.Series;
-                }
-                else if (item is Series series && providerName == "MovieDb.MovieDbSeriesProvider")
-                {
-                    CurrentSeries.Value = series;
-                }
+            if (item is Episode episode)
+            {
+                CurrentSeries.Value = episode.Series;
+            }
+            else if (item is Season season)
+            {
+                CurrentSeries.Value = season.Series;
+            }
+            else if (item is Series series)
+            {
+                CurrentSeries.Value = series;
             }
         }
 
         [HarmonyPrefix]
-        private static void SeriesGetMetadataPrefix(SeriesInfo info, CancellationToken cancellationToken,
+        private static void SeriesGetMetadataPrefix(CancellationToken cancellationToken,
             Task<MetadataResult<Series>> __result, out string __state)
         {
             __state = null;
@@ -174,7 +182,7 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPostfix]
-        private static void SeriesGetMetadataPostfix(SeriesInfo info, CancellationToken cancellationToken,
+        private static void SeriesGetMetadataPostfix(CancellationToken cancellationToken,
             Task<MetadataResult<Series>> __result, string __state)
         {
             if (__state is null) return;

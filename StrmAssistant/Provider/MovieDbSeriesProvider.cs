@@ -1,4 +1,5 @@
 using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Providers;
 using StrmAssistant.Common;
@@ -16,6 +17,20 @@ namespace StrmAssistant.Provider
     public class MovieDbSeriesProvider : ISeriesMetadataProvider
     {
         public string Name => "TheMovieDb";
+
+        // Emby 4.11 的 ISeriesMetadataProvider 新增 Key；同样必须 virtual 才能被 CLR 映射。
+        public virtual string Key => Name;
+
+        /// <summary>
+        /// Emby 4.11 的 ISeriesMetadataProvider 新增成员。必须声明为 virtual：
+        /// 编译时引用的 4.9 接口没有该成员，非 virtual 方法不会被 CLR 映射为接口实现，
+        /// 4.11 运行时会抛 TypeLoadException。
+        /// </summary>
+        public virtual Task<NameIdPair[]> GetSeriesOrders(SeriesInfo searchInfo,
+            CancellationToken cancellationToken)
+        {
+            return Task.FromResult(Array.Empty<NameIdPair>());
+        }
 
         public async Task<RemoteSearchResult[]> GetAllEpisodes(SeriesInfo seriesInfo,
             CancellationToken cancellationToken)
