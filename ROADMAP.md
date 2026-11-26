@@ -8,17 +8,17 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 711/711 通过；Release 构建 0 警告 0 错误。
+- 单测 715/715 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
-- 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护。
+- 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护；4.11 外挂字幕扫描恢复。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
 - 关闭功能 smoke：MergeMultiVersion、ServerSideVersionLabel、CustomLocalDiscovery（4.10/4.11）、深度删除自定义通知通过。
 - 4.11 通知保留原生分组与插件自定义通知；剧集摘要注入确认为不可靠，已跳过相关钩子。4.10 完整通知补丁可用。
 - 明确限制：4.11 不挂批量 DTO、不 patch `SaveChapters`；ExclusiveExtract 保持受限模式并关闭；插件指纹使用原生检测。
 - `UnlockIntroSkip` STRM 修复通过：真实片头样本两集均被原生任务选中；合成片尾样本的普通 MP4、本地 STRM 与本机 Range STRM 均写入 `CreditsStart` 标记。
 - 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余两个被 Windows 句柄锁住的空缓存目录，无数据残留。
-- 4.11 适配、发布前安全修复与 STRM 片尾修复已递交推送；空引用防护与文档待递交，升版本号、打 tag 和发版均需用户确认。
-- 运行时验收：空引用防护 DLL（SHA-256 `feeddd2f…`）在隔离 4.11 小库完成两集刷新与详情 DTO 验证，`PreferredMetadataLanguage=None`、HTTP 200、运行时错误 0；主 4.11 与 4.10 测试实例恢复后均启动 Healthy。上一批 STRM 片尾 DLL 为 `0ed50e81…`。
+- 4.11 适配、发布前安全修复与 STRM 片尾修复已递交推送；空引用防护已本地递交，外挂字幕恢复待递交，升版本号、打 tag 和发版均需用户确认。
+- 运行时验收：外挂字幕恢复 DLL（SHA-256 `44b98ad3…`）在隔离 4.11 单电影小库完成外挂 `.srt` 扫描与落库，任务记录 `Item Processed`、字幕错误 0；主 4.11 与 4.10 测试实例均为 Healthy，4.10 旧 Harmony 路径保持正常。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
@@ -179,9 +179,13 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 
 使用真实多 m2ts 本地 ISO 验证正片选择、流数量、码率、章节和语言；现有证据为单标题与 300 段合成盘，不能替代真实多 m2ts 样本。
 
-### 7. 4.11 外挂字幕稳定入口（按需）
+### 7. 4.11 外挂字幕稳定入口 — ✅ 已完成（2026-11-27）
 
-仅在需要插件“扫描外挂字幕”任务时启动：研究 4.11 的公开契约或稳定反射入口，恢复扫描、刷新与恢复后更新；否则保持 Unsupported，不影响 Emby 原生字幕发现、外挂音轨和语言规范化。
+- `SubtitleResolver` 旧方法名已移除，改为按 `BaseTrackResolver(BaseItem,int,IDirectoryService,LibraryOptions,NamingOptions,bool) -> List<MediaStream>` 稳定签名解析。
+- 外挂字幕探测更新器按 `IMediaProbeManager` 构造参数和 `(BaseItem,MediaStream,MetadataRefreshOptions,LibraryOptions,CancellationToken) -> Task<bool>` 唯一签名解析；4.11 使用 Reflection，不再对混淆方法名做 Harmony 逆向补丁。
+- 4.10 保持原类型名与 Harmony 路径；两套实例启动均 Healthy。
+- 隔离 4.11 单电影小库：初始无外挂字幕，新增 `.srt` 后运行“扫描外挂字幕与音轨”，DTO 落库 `IsExternal=True`、语言 `zh`，日志 `ExternalSubtitle - Item Processed`，字幕错误 0。
+- 全量 715/715 通过，Release 构建 0 警告 0 错误；最终 DLL SHA-256 `44b98ad37187f25bf287970cc39696e6950e0ca9a90f20f0fbb9852894bdf496`。
 
 ### 8. 4.9 / ARM64 回归（仅用户需要时）
 

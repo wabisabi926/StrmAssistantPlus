@@ -67,43 +67,69 @@ namespace StrmAssistant.Common
                     {
                         typeof(ILocalizationManager), typeof(IFileSystem), typeof(ILibraryManager)
                     });
-                    
+
                     if (subtitleResolverConstructor != null)
                     {
                         _subtitleResolver = subtitleResolverConstructor.Invoke(new object[]
                         {
                             localizationManager, fileSystem, libraryManager
                         });
-                        
-                        var methods = subtitleResolverType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-                            .Where(m => m.Name == "GetExternalSubtitleStreams" || 
-                                       m.Name == "GetExternalStreams" || 
-                                       m.Name == "GetExternalTracks")
-                            .ToArray();
-                        
-                        if (methods.Length > 0)
+
+                        if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
                         {
-                            _getExternalSubtitleStreams = methods.OrderByDescending(m => m.GetParameters().Length).First();
-                            
+                            var baseTrackResolverType = EmbyVersionAdapter.Instance.TryGetType("Emby.Providers",
+                                "Emby.Providers.MediaInfo.BaseTrackResolver");
+                            _getExternalSubtitleStreams = FindExternalSubtitleStreamsMethod(baseTrackResolverType);
+
+                            var ffProbeSubtitleInfoType = FindSubtitleProbeUpdaterType(embyProviders.GetTypes());
+                            if (ffProbeSubtitleInfoType != null)
+                            {
+                                var constructor = ffProbeSubtitleInfoType.GetConstructor(
+                                    BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null,
+                                    new[] { typeof(IMediaProbeManager) }, null);
+                                if (constructor != null)
+                                {
+                                    _ffProbeSubtitleInfo = constructor.Invoke(new object[] { mediaProbeManager });
+                                    _updateExternalSubtitleStream = ffProbeSubtitleInfoType
+                                        .GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                        .SingleOrDefault(IsSubtitleProbeUpdateMethod);
+                                }
+                            }
+
+                            PatchTracker.FallbackPatchApproach = PatchApproach.Reflection;
+                        }
+                        else
+                        {
+                            var methods = subtitleResolverType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                                .Where(m => m.Name == "GetExternalSubtitleStreams" ||
+                                           m.Name == "GetExternalStreams" ||
+                                           m.Name == "GetExternalTracks")
+                                .ToArray();
+
+                            if (methods.Length > 0)
+                            {
+                                _getExternalSubtitleStreams = methods.OrderByDescending(m => m.GetParameters().Length).First();
+                            }
+
+                            var ffProbeSubtitleInfoType = EmbyVersionAdapter.Instance.TryGetType("Emby.Providers",
+                                "Emby.Providers.MediaInfo.FFProbeSubtitleInfo");
+                            if (ffProbeSubtitleInfoType != null)
+                            {
+                                var constructor = ffProbeSubtitleInfoType.GetConstructor(new[] { typeof(IMediaProbeManager) });
+                                if (constructor != null)
+                                {
+                                    _ffProbeSubtitleInfo = constructor.Invoke(new object[] { mediaProbeManager });
+                                    _updateExternalSubtitleStream = ffProbeSubtitleInfoType.GetMethod("UpdateExternalSubtitleStream");
+                                }
+                            }
+                        }
+
+                        if (_getExternalSubtitleStreams != null)
+                        {
                             var paramCount = _getExternalSubtitleStreams.GetParameters().Length;
                             var paramTypes = string.Join(", ", _getExternalSubtitleStreams.GetParameters().Select(p => p.ParameterType.Name));
-                            _logger.Info($"{nameof(SubtitleApi)}: Found {_getExternalSubtitleStreams.Name} with {paramCount} parameters: {paramTypes}");
+                            _logger.Info($"{nameof(SubtitleApi)}: Found external subtitle resolver with {paramCount} parameters: {paramTypes}");
                         }
-                    }
-                }
-
-                var ffProbeSubtitleInfoType = EmbyVersionAdapter.Instance.TryGetType("Emby.Providers", "Emby.Providers.MediaInfo.FFProbeSubtitleInfo");
-                if (ffProbeSubtitleInfoType != null)
-                {
-                    var ffProbeSubtitleInfoConstructor = ffProbeSubtitleInfoType.GetConstructor(new[]
-                    {
-                        typeof(IMediaProbeManager)
-                    });
-                    
-                    if (ffProbeSubtitleInfoConstructor != null)
-                    {
-                        _ffProbeSubtitleInfo = ffProbeSubtitleInfoConstructor.Invoke(new object[] { mediaProbeManager });
-                        _updateExternalSubtitleStream = ffProbeSubtitleInfoType.GetMethod("UpdateExternalSubtitleStream");
                     }
                 }
             }
@@ -120,7 +146,7 @@ namespace StrmAssistant.Common
                 _logger.Info($"{nameof(SubtitleApi)} - Subtitle integration unavailable on this Emby version");
                 return;
             }
-            else if (Plugin.Instance.IsModSupported)
+            else if (EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11 && Plugin.Instance.IsModSupported)
             {
                 // 执行 Harmony 逆向打补丁
                 var patch1 = PatchManager.ReversePatch(PatchTracker, _getExternalSubtitleStreams,
@@ -152,6 +178,52 @@ namespace StrmAssistant.Common
             {
                 PatchTracker.MarkInitialized();
             }
+        }
+
+        internal static MethodInfo FindExternalSubtitleStreamsMethod(Type resolverType)
+        {
+            if (resolverType == null) return null;
+
+            var methods = resolverType.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                .Where(m => m.ReturnType == typeof(List<MediaStream>) &&
+                            m.GetParameters().Select(p => p.ParameterType).SequenceEqual(new[]
+                            {
+                                typeof(BaseItem), typeof(int), typeof(IDirectoryService), typeof(LibraryOptions),
+                                typeof(NamingOptions), typeof(bool)
+                            }))
+                .ToArray();
+            return methods.Length == 1 ? methods[0] : null;
+        }
+
+        internal static Type FindSubtitleProbeUpdaterType(IEnumerable<Type> types)
+        {
+            Type match = null;
+            foreach (var type in types)
+            {
+                if (type.GetConstructor(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance, null,
+                        new[] { typeof(IMediaProbeManager) }, null) == null)
+                {
+                    continue;
+                }
+
+                var methods = type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    .Where(IsSubtitleProbeUpdateMethod)
+                    .ToArray();
+                if (methods.Length != 1) continue;
+                if (match != null) return null;
+                match = type;
+            }
+            return match;
+        }
+
+        private static bool IsSubtitleProbeUpdateMethod(MethodInfo method)
+        {
+            return method.ReturnType == typeof(Task<bool>) &&
+                   method.GetParameters().Select(p => p.ParameterType).SequenceEqual(new[]
+                   {
+                       typeof(BaseItem), typeof(MediaStream), typeof(MetadataRefreshOptions),
+                       typeof(LibraryOptions), typeof(CancellationToken)
+                   });
         }
 
         // --- 核心修改点 1: Stub 增加 LibraryOptions ---
