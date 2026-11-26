@@ -308,7 +308,7 @@ The plugin adapts dynamically: it detects the Emby version at startup, prefers H
 - **Alternative implementations**: batch DTO filtering uses model setters; intro detection uses native MarkerDetector; discovery overrides use serialization; image capture has a direct-extraction fallback.
 - **Currently unavailable**: plugin external-subtitle scan/refresh, plugin fingerprint task, BoxSet auto-creation blocking, series notification summaries, and `-skip_frame` keyframe optimization.
 - **Limited**: ExclusiveExtract is off by default and retains limited mode only on 4.11; numeric/provider-ID search enhancements are disabled; no global `SaveChapters` protection hook; deep delete handles local targets only and keeps empty folders.
-- **Not yet validated**: real multi-m2ts local ISO, real BDMV, weak-network sampling, real STRM audio-fingerprint detection, and Emby 4.9/ARM64.
+- **Not yet validated**: real multi-m2ts local ISO, weak-network sampling, and Emby 4.9/ARM64. Real STRM intro detection passed; credits detection still fails during remote fast-seek. BDMV is not supported.
 
 > ISO extraction: Emby's third-party `IsoMounter` plugin is incompatible with 4.10 and blocks ISO probing; disable or remove it. This plugin does not depend on it. Local ISOs need no mount on Linux/Docker, and Windows falls back to title sampling when mounting fails.
 

@@ -154,14 +154,7 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 无 mismatch，落库 mpegts/600s/2 路 hevc。测试用临时库/文件已清理，**ISO 测试库与文件保留在 NAS**
 （`strmassistant-iso-test`），便于复测；验证用 API Key 不入库。
 
-### 4. BDMV 目录支持（下一版）
-
-合成 BDMV 目录（占位 CLPI/index）入库后 Emby 未给出流/码率/时长，无 BlurayMounter 日志。
-占位 CLPI 可能让 BDInfo 扫描失败，**不足以判定不支持**——先用真实 BDMV 目录复测；
-若仍为空，评估插件侧 `HostMounter` 路径：复用本仓 MPLS/STN 解析只补章节/语言，不引入 BDInfo。
-测试台：`.workbuddy-ai/iso-test/build_bdmv_folder.py`。
-
-### 5. ISO 采样精度与弱网（P1）
+### 4. ISO 采样精度与弱网（P1）
 
 - ~~单流码率改按样本内各 PID 字节占比分配~~ ✅ 已完成（`TsByteAccounting`）：ffprobe 对 mpegts 的
   视频流一律给 `bit_rate=N/A`，Emby 只能把容器码率**等分**给各路视频，带画中画的原盘会把 PiP
@@ -174,19 +167,19 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
   两端最终 `47.28 / 3.58`，见文首完成记录。
 - 远程采样预算自适应（弱网降到 32MB/128 段），需真机弱网验证。
 
-### 6. 真实 STRM 原生片头/片尾内容验收
+### 5. 真实 STRM 原生片头/片尾内容验收（部分完成）
 
-使用本机 4.11 中同季至少两个真实 STRM 集，运行原生片头/片尾任务并人工核对时间；当前只验证了任务入选与 `supported=True`，未验证真实音频指纹结果。
+本机 4.11 使用《武林外传》S01E01/E02 两个真实 STRM：片头任务完成，两集均生成音频指纹并识别出同一段约 97.3 秒片头，置信度 0.9；片尾任务在远程 STRM 的快速 Seek 阶段失败，重试无候选，需进一步区分 Emby 原生 ffmpeg 参数与远程 Range 服务限制。
 
-### 7. 真实多 m2ts 本地 ISO
+### 6. 真实多 m2ts 本地 ISO
 
 使用真实多 m2ts 本地 ISO 验证正片选择、流数量、码率、章节和语言；现有证据为单标题与 300 段合成盘，不能替代真实多 m2ts 样本。
 
-### 8. 4.11 外挂字幕稳定入口（按需）
+### 7. 4.11 外挂字幕稳定入口（按需）
 
 仅在需要插件“扫描外挂字幕”任务时启动：研究 4.11 的公开契约或稳定反射入口，恢复扫描、刷新与恢复后更新；否则保持 Unsupported，不影响 Emby 原生字幕发现、外挂音轨和语言规范化。
 
-### 9. 4.9 / ARM64 回归（仅用户需要时）
+### 8. 4.9 / ARM64 回归（仅用户需要时）
 
 具备对应设备后再跑同一套启动健康、中文搜索、ISO、截图、章节、多版本和通知冒烟；未验收前不承诺完整功能一致。
 
