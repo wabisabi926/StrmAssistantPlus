@@ -38,7 +38,7 @@ namespace StrmAssistant.Options
         [DisplayNameL("ExperienceEnhanceOptions_Group_Safety", typeof(Resources))]
         public SafetyOptions Safety { get; set; } = new SafetyOptions();
 
-        /// <summary>通知：剧集通知显示集详情与触发字段。</summary>
+        /// <summary>通知：自定义通知与触发字段；剧集摘要取决于 Emby 通知接口支持情况。</summary>
         [DisplayNameL("ExperienceEnhanceOptions_Group_Notification", typeof(Resources))]
         public ExperienceNotificationOptions Notification { get; set; } = new ExperienceNotificationOptions();
 

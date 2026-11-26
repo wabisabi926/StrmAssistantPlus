@@ -1,6 +1,8 @@
 using HarmonyLib;
 using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,13 +13,16 @@ namespace StrmAssistant.Mod
 {
     public class EnforceLibraryOrder : PatchBase<EnforceLibraryOrder>
     {
-        private static MethodInfo _getUserViews;
+        private static readonly List<MethodInfo> _getUserViewsTargets = new List<MethodInfo>();
 
         public EnforceLibraryOrder()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().LibraryOrder.EnforceLibraryOrder;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().LibraryOrder.EnforceLibraryOrder)
+            if (enabled)
             {
                 Patch();
             }
@@ -26,16 +31,32 @@ namespace StrmAssistant.Mod
         protected override void OnInitialize()
         {
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
-            var userViewManager =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Library.UserViewManager");
-            _getUserViews = userViewManager.GetMethods(BindingFlags.Instance | BindingFlags.Public)
-                .FirstOrDefault(m => m.Name == "GetUserViews" &&
-                                     (m.GetParameters().Length == 3 || m.GetParameters().Length == 4));
+            var userViewManagerImpl = EmbyTargetResolver.FindImplementationType(
+                embyServerImplementationsAssembly, typeof(IUserViewManager));
+
+            if (userViewManagerImpl != null)
+            {
+                foreach (var method in userViewManagerImpl.GetMethods(BindingFlags.Instance | BindingFlags.Public)
+                             .Where(m => m.Name == "GetUserViews" && m.ReturnType == typeof(Folder[])))
+                {
+                    _getUserViewsTargets.Add(method);
+                }
+            }
+
+            if (_getUserViewsTargets.Count == 0)
+            {
+                Require(TargetResolution.Missing(
+                    "IUserViewManager.GetUserViews(UserViewQuery[, ...]) -> Folder[]",
+                    "implementation method not found"));
+            }
         }
 
         protected override void Prepare(bool apply)
         {
-            PatchUnpatch(PatchTracker, apply, _getUserViews, postfix: nameof(GetUserViewsPostfix));
+            foreach (var target in _getUserViewsTargets)
+            {
+                PatchUnpatch(PatchTracker, apply, target, postfix: nameof(GetUserViewsPostfix));
+            }
         }
 
         [HarmonyPostfix]

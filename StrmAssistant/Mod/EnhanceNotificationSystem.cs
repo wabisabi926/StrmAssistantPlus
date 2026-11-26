@@ -12,6 +12,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using StrmAssistant.Core;
 using static StrmAssistant.Mod.PatchManager;
 
 namespace StrmAssistant.Mod
@@ -32,9 +33,12 @@ namespace StrmAssistant.Mod
 
         public EnhanceNotificationSystem()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Notification.EnhanceNotificationSystem;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().Notification.EnhanceNotificationSystem)
+            if (enabled)
             {
                 Patch();
             }
@@ -44,14 +48,26 @@ namespace StrmAssistant.Mod
         {
             var notificationsAssembly = Assembly.Load("Emby.Notifications");
             var notificationManager = notificationsAssembly.GetType("Emby.Notifications.NotificationManager");
-            _convertToGroups = notificationManager.GetMethod("ConvertToGroups",
-                BindingFlags.Instance | BindingFlags.NonPublic);
-            _sendNotification = notificationManager.GetMethod("SendNotification",
-                BindingFlags.NonPublic | BindingFlags.Instance, null,
-                new[] { typeof(INotifier), typeof(NotificationInfo[]), typeof(NotificationRequest), typeof(bool) },
-                null);
+
+            if (notificationManager != null)
+            {
+                // 4.11 私有方法名被混淆，按签名定位；4.9/4.10 名称匹配仍可用作兜底。
+                _convertToGroups = EmbyTargetResolver.ResolveBySignature(notificationManager,
+                    new[] { typeof(ItemChangeEventArgs[]) },
+                    typeof(Dictionary<long, List<ItemChangeEventArgs>>), false).Method ??
+                    notificationManager.GetMethod("ConvertToGroups",
+                        BindingFlags.Instance | BindingFlags.NonPublic);
+                _sendNotification = EmbyTargetResolver.ResolveBySignature(notificationManager,
+                    new[] { typeof(INotifier), typeof(NotificationInfo[]), typeof(NotificationRequest), typeof(bool) },
+                    typeof(void), false).Method ??
+                    notificationManager.GetMethod("SendNotification",
+                        BindingFlags.NonPublic | BindingFlags.Instance, null,
+                        new[] { typeof(INotifier), typeof(NotificationInfo[]), typeof(NotificationRequest), typeof(bool) },
+                        null);
+            }
+
             var notificationQueueManager = notificationsAssembly.GetType("Emby.Notifications.NotificationQueueManager");
-            _queueNotification = notificationQueueManager.GetMethod("QueueNotification",
+            _queueNotification = notificationQueueManager?.GetMethod("QueueNotification",
                 BindingFlags.Instance | BindingFlags.Public, null,
                 new[] { typeof(INotifier), typeof(InternalNotificationRequest), typeof(int) }, null);
 
@@ -65,28 +81,43 @@ namespace StrmAssistant.Mod
 
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
             var libraryManager =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Library.LibraryManager");
-            _deleteItem = libraryManager.GetMethod("DeleteItem",
+                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Library.LibraryManager") ??
+                EmbyTargetResolver.FindImplementationType(embyServerImplementationsAssembly, typeof(ILibraryManager));
+            _deleteItem = libraryManager?.GetMethod("DeleteItem",
                 BindingFlags.Instance | BindingFlags.Public, null,
                 new[] { typeof(BaseItem), typeof(DeleteOptions), typeof(BaseItem), typeof(bool) }, null);
         }
 
         protected override void Prepare(bool apply)
         {
-            PatchUnpatch(PatchTracker, apply, _convertToGroups, postfix: nameof(ConvertToGroupsPostfix));
-            PatchUnpatch(PatchTracker, apply, _sendNotification, prefix: nameof(SendNotificationPrefix));
-            PatchUnpatch(PatchTracker, apply, _queueNotification, prefix: nameof(QueueNotificationPrefix));
-            PatchUnpatch(PatchTracker, apply, _deleteItemsRequest, prefix: nameof(DeleteItemsRequestPrefix),
-                postfix: nameof(DeleteItemsRequestPostfix));
-            PatchUnpatch(PatchTracker, apply, _deleteItem, prefix: nameof(DeleteItemPrefix),
-                finalizer: nameof(DeleteItemFinalizer));
+            if (EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11)
+            {
+                if (_convertToGroups != null)
+                    PatchUnpatch(PatchTracker, apply, _convertToGroups, postfix: nameof(ConvertToGroupsPostfix));
+                if (_sendNotification != null)
+                    PatchUnpatch(PatchTracker, apply, _sendNotification, prefix: nameof(SendNotificationPrefix));
+                if (_queueNotification != null)
+                    PatchUnpatch(PatchTracker, apply, _queueNotification, prefix: nameof(QueueNotificationPrefix));
+            }
+            else
+            {
+                Plugin.Instance.Logger.Info(
+                    "EnhanceNotificationSystem - series summary injection skipped; native notifications and custom notifications remain available");
+            }
+
+            if (_deleteItemsRequest != null)
+                PatchUnpatch(PatchTracker, apply, _deleteItemsRequest, prefix: nameof(DeleteItemsRequestPrefix),
+                    postfix: nameof(DeleteItemsRequestPostfix));
+            if (_deleteItem != null)
+                PatchUnpatch(PatchTracker, apply, _deleteItem, prefix: nameof(DeleteItemPrefix),
+                    finalizer: nameof(DeleteItemFinalizer));
         }
 
         [HarmonyPostfix]
-        private static void ConvertToGroupsPostfix(ItemChangeEventArgs[] list,
+        private static void ConvertToGroupsPostfix(ItemChangeEventArgs[] __0,
             ref Dictionary<long, List<ItemChangeEventArgs>> __result)
         {
-            var filteredItems = list.Where(i => i.Item.SeriesId != 0L).ToArray();
+            var filteredItems = __0?.Where(i => i.Item.SeriesId != 0L).ToArray() ?? Array.Empty<ItemChangeEventArgs>();
 
             if (filteredItems.Length == 0) return;
 
@@ -95,11 +126,13 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPrefix]
-        private static void SendNotificationPrefix(INotifier notifier, NotificationInfo[] notifications,
-            NotificationRequest request, bool enableUserDataInDto)
+        private static void SendNotificationPrefix(INotifier __0, NotificationInfo[] __1,
+            NotificationRequest __2, bool __3)
         {
-            if (notifications.FirstOrDefault()?.GroupItems is true
-                && request.Item is Series series && GroupDetails.Value != null
+            var notifications = __1;
+            var request = __2;
+            if (notifications?.FirstOrDefault()?.GroupItems is true
+                && request?.Item is Series series && GroupDetails.Value != null
                 && GroupDetails.Value.TryGetValue(series.InternalId, out var groupDetails))
             {
                 var groupedBySeason = groupDetails.Where(e => e.ParentIndexNumber.HasValue)
@@ -108,10 +141,8 @@ namespace StrmAssistant.Mod
                     .ToList();
 
                 var descriptions = new List<string>();
-
                 foreach (var seasonGroup in groupedBySeason)
                 {
-                    var seasonIndex = seasonGroup.Key;
                     var episodesBySeason = seasonGroup
                         .Where(e => e.IndexNumber.HasValue)
                         .OrderBy(e => e.IndexNumber.Value)
@@ -119,7 +150,7 @@ namespace StrmAssistant.Mod
                         .Distinct()
                         .ToList();
 
-                    if (!episodesBySeason.Any()) continue;
+                    if (episodesBySeason.Count == 0) continue;
 
                     var episodeRanges = new List<string>();
                     var rangeStart = episodesBySeason[0];
@@ -142,14 +173,11 @@ namespace StrmAssistant.Mod
                     episodeRanges.Add(rangeStart == lastEpisodeInRange
                         ? $"E{rangeStart:D2}"
                         : $"E{rangeStart:D2}-E{lastEpisodeInRange:D2}");
-
-                    descriptions.Add($"S{seasonIndex:D2} {string.Join(", ", episodeRanges)}");
+                    descriptions.Add($"S{seasonGroup.Key:D2} {string.Join(", ", episodeRanges)}");
                 }
 
                 var summary = string.Join(" / ", descriptions);
-
                 var tmdbId = series.GetProviderId(MetadataProviders.Tmdb);
-
                 if (!string.IsNullOrEmpty(tmdbId))
                 {
                     summary += $"{Environment.NewLine}{Environment.NewLine}TmdbId: {tmdbId}";
@@ -191,7 +219,7 @@ namespace StrmAssistant.Mod
         {
             __state = null;
 
-            if (options.DeleteFileLocation)
+            if (options.DeleteFileLocation && item != null)
             {
                 var collectionFolder = options.CollectionFolders ?? __instance.GetCollectionFolders(item);
                 var scope = item.GetDeletePaths(true, collectionFolder).Select(i => i.FullName).ToArray();

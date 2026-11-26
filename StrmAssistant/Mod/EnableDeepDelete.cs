@@ -2,6 +2,7 @@ using HarmonyLib;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,9 +18,12 @@ namespace StrmAssistant.Mod
 
         public EnableDeepDelete()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Playback.EnableDeepDelete;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().Playback.EnableDeepDelete)
+            if (enabled)
             {
                 Patch();
             }
@@ -27,12 +31,13 @@ namespace StrmAssistant.Mod
 
         protected override void OnInitialize()
         {
-            var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
-            var libraryManager =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Library.LibraryManager");
-            _deleteItem = libraryManager.GetMethod("DeleteItem",
-                BindingFlags.Instance | BindingFlags.Public, null,
-                new[] { typeof(BaseItem), typeof(DeleteOptions), typeof(BaseItem), typeof(bool) }, null);
+            var libraryManagerType = EmbyTargetResolver.GetImplementationType(BaseItem.LibraryManager) ??
+                                     EmbyTargetResolver.FindImplementationType(
+                                         Assembly.Load("Emby.Server.Implementations"),
+                                         typeof(MediaBrowser.Controller.Library.ILibraryManager));
+
+            _deleteItem = Require(EmbyTargetResolver.ResolveByName(libraryManagerType, "DeleteItem",
+                new[] { typeof(BaseItem), typeof(DeleteOptions), typeof(BaseItem), typeof(bool) })).Method;
         }
 
         protected override void Prepare(bool apply)
