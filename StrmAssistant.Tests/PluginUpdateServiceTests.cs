@@ -142,6 +142,24 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void Summarize_FailedStateIncludesServerMessage()
+        {
+            var status = new PluginUpdateStatus
+            {
+                State = PluginUpdateState.Failed,
+                CurrentVersion = "4.0.1.2",
+                LatestVersion = "4.0.1.2",
+                LastCheckUtc = DateTimeOffset.UtcNow,
+                Message = "GitHub API returned 403."
+            };
+
+            var summary = PluginUpdateService.Summarize(status);
+
+            Assert.Contains("403", summary);
+            Assert.Contains(status.Message, summary);
+        }
+
+        [Fact]
         public void DescribeGitHubHttpError_MapsStatusCodes()
         {
             var checkForbidden = PluginUpdateService.DescribeGitHubHttpError(HttpStatusCode.Forbidden, false);

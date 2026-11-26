@@ -260,7 +260,9 @@ namespace StrmAssistant.Common
                         status.LatestVersion ?? "-");
                     break;
                 case PluginUpdateState.Failed:
-                    stateText = Resources.PluginUpdate_Status_Failed;
+                    stateText = string.IsNullOrWhiteSpace(status.Message)
+                        ? Resources.PluginUpdate_Status_Failed
+                        : Resources.PluginUpdate_Status_Failed + " · " + status.Message;
                     break;
                 default:
                     stateText = status.Message ?? string.Empty;
