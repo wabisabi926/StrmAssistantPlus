@@ -75,10 +75,10 @@ namespace StrmAssistant.ScheduledTask
             var movieLibraryGroups = PrepareMergeMovies(currentScanLibrary);
 
             var processSeries = seriesLibraryGroups.Any() && (currentScanLibrary is null ||
-                                                              currentScanLibrary.CollectionType == CollectionType.TvShows.ToString() ||
+                                                              string.Equals(currentScanLibrary.CollectionType, CollectionType.TvShows.ToString(), StringComparison.OrdinalIgnoreCase) ||
                                                               currentScanLibrary.CollectionType is null);
             var processMovies = movieLibraryGroups.Any() && (currentScanLibrary is null ||
-                                                             currentScanLibrary.CollectionType == CollectionType.Movies.ToString() ||
+                                                             string.Equals(currentScanLibrary.CollectionType, CollectionType.Movies.ToString(), StringComparison.OrdinalIgnoreCase) ||
                                                              currentScanLibrary.CollectionType is null);
 
             if (processSeries)
@@ -171,7 +171,7 @@ namespace StrmAssistant.ScheduledTask
             _logger.Info("MergeMultiVersion - Scheduled Task Complete");
         }
 
-        public string Category => Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+        public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_MultiVersion",
             Plugin.Instance.DefaultUICulture);
 
         public string Key => "MergeMultiVersionTask";
@@ -218,35 +218,28 @@ namespace StrmAssistant.ScheduledTask
 
         private List<BaseItem> FindDuplicateSeries(long[] parents)
         {
-            var allSeries = _libraryManager.GetItemList(new InternalItemsQuery
+            var allSeries = parents.SelectMany(parent =>
+            {
+                var query = new InternalItemsQuery
                 {
                     Recursive = true,
-                    ParentIds = parents,
                     IncludeItemTypes = new[] { nameof(Series) },
                     HasAnyProviderId = new[]
                     {
                         MetadataProviders.Tmdb.ToString(), MetadataProviders.Imdb.ToString(),
                         MetadataProviders.Tvdb.ToString()
                     }
-                })
-                .ToList();
+                };
+                StrmAssistant.Common.LibraryApi.SetSingleParent(query, parent);
+                return _libraryManager.GetItemList(query);
+            }).ToList();
 
             var dupSeries = allSeries
                 .SelectMany(item =>
                     item.ProviderIds.Where(kvp => ProviderIdCheckKeys.Contains(kvp.Key))
                         .Select(kvp => new { kvp.Key, kvp.Value, item }))
                 .GroupBy(x => new { x.Key, x.Value })
-                .Where(g =>
-                {
-                    var uniqueKeys = new HashSet<string>();
-                    foreach (var x in g)
-                    {
-                        uniqueKeys.Add(x.item.PresentationUniqueKey);
-                        if (uniqueKeys.Count > 1) return true;
-                    }
-
-                    return false;
-                })
+                .Where(g => g.Select(x => x.item.InternalId).Distinct().Count() > 1)
                 .SelectMany(g => g.Select(x => x.item))
                 .GroupBy(item => item.InternalId)
                 .Select(g => g.First())
@@ -257,14 +250,17 @@ namespace StrmAssistant.ScheduledTask
 
         private List<Series> FindInconsistentSeries(long[] parents)
         {
-            var allSeries = _libraryManager.GetItemList(new InternalItemsQuery
+            var allSeries = parents.SelectMany(parent =>
+            {
+                var query = new InternalItemsQuery
                 {
                     Recursive = true,
-                    ParentIds = parents,
                     IncludeItemTypes = new[] { nameof(Season), nameof(Episode) },
                     GroupBySeriesPresentationUniqueKey = true
-                })
-                .ToList();
+                };
+                StrmAssistant.Common.LibraryApi.SetSingleParent(query, parent);
+                return _libraryManager.GetItemList(query);
+            }).ToList();
 
             var inconsistentSeries = allSeries
                 .Select(item => new
@@ -316,33 +312,33 @@ namespace StrmAssistant.ScheduledTask
 
         private void ExecuteMergeMovies(long[] parents, IProgress<double> groupProgress = null)
         {
-            var allMovies = _libraryManager.GetItemList(new InternalItemsQuery
+            var allMovies = parents.SelectMany(parent =>
             {
-                Recursive = true,
-                ParentIds = parents,
-                IncludeItemTypes = new[] { nameof(Movie) },
-                HasAnyProviderId = new[]
+                var query = new InternalItemsQuery
                 {
-                    MetadataProviders.Tmdb.ToString(),
-                    MetadataProviders.Imdb.ToString(),
-                    MetadataProviders.Tvdb.ToString()
-                }
+                    Recursive = true,
+                    IncludeItemTypes = new[] { nameof(Movie) },
+                    HasAnyProviderId = new[]
+                    {
+                        MetadataProviders.Tmdb.ToString(),
+                        MetadataProviders.Imdb.ToString(),
+                        MetadataProviders.Tvdb.ToString()
+                    }
+                };
+                StrmAssistant.Common.LibraryApi.SetSingleParent(query, parent);
+                return _libraryManager.GetItemList(query);
             }).Cast<Movie>().ToList();
 
-            var dupMovies = allMovies
+            var providerGroups = allMovies
                 .SelectMany(item =>
                     item.ProviderIds.Where(kvp => ProviderIdCheckKeys.Contains(kvp.Key))
                         .Select(kvp => new { kvp.Key, kvp.Value, item }))
                 .GroupBy(kvp => new { kvp.Key, kvp.Value })
-                .Where(g =>
-                {
-                    var groupItems = g.Select(kvp => kvp.item).ToList();
+                .ToList();
+            _logger.Info($"MergeMultiVersion - Movie candidates: {allMovies.Count}, provider groups: {providerGroups.Count}, largest group: {(providerGroups.Count == 0 ? 0 : providerGroups.Max(g => g.Count()))}");
 
-                    var altVersionCount = g.Sum(kvp =>
-                        kvp.item.GetAlternateVersionIds().Count(id => groupItems.Any(i => i.InternalId == id)));
-
-                    return g.Count() != 1 + altVersionCount / g.Count();
-                })
+            var dupMovies = providerGroups
+                .Where(g => g.Select(kvp => kvp.item.InternalId).Distinct().Count() > 1)
                 .ToList();
             allMovies.Clear();
             allMovies.TrimExcess();

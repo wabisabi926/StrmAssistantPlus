@@ -2,6 +2,7 @@ using HarmonyLib;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Model.Dto;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -32,9 +33,11 @@ namespace StrmAssistant.Mod
 
         public ServerSideVersionLabel()
         {
+            PatchTracker.IsFeatureEnabled = IsEnabled();
+
             Initialize();
 
-            if (IsEnabled()) Patch();
+            if (PatchTracker.IsFeatureEnabled) Patch();
         }
 
         private static bool IsEnabled()
@@ -47,13 +50,20 @@ namespace StrmAssistant.Mod
         {
             try
             {
-                var assembly = Assembly.Load("Emby.Server.Implementations");
-                var manager = assembly.GetType("Emby.Server.Implementations.Library.MediaSourceManager");
+                var managerType = EmbyTargetResolver.GetImplementationType(BaseItem.MediaSourceManager) ??
+                                  EmbyTargetResolver.FindImplementationType(
+                                      Assembly.Load("Emby.Server.Implementations"),
+                                      typeof(MediaBrowser.Controller.Library.IMediaSourceManager));
 
                 // 只取最内层重载（10 参）：其余重载都会转到它，打一个点即可覆盖 DTO 与 PlaybackInfo 两条路径
-                _target = manager?
-                    .GetMethods(BindingFlags.Public | BindingFlags.Instance)
-                    .FirstOrDefault(m => m.Name == "GetStaticMediaSources" && m.GetParameters().Length == 10);
+                _target = Require(EmbyTargetResolver.ResolveByName(managerType, "GetStaticMediaSources",
+                    new[]
+                    {
+                        typeof(BaseItem), typeof(bool), typeof(bool), typeof(bool), typeof(bool),
+                        typeof(BaseItem[]), typeof(MediaBrowser.Model.Configuration.LibraryOptions),
+                        typeof(MediaBrowser.Model.Dlna.DeviceProfile), typeof(MediaBrowser.Controller.Entities.User),
+                        typeof(System.Threading.CancellationToken)
+                    }, typeof(List<MediaSourceInfo>), false)).Method;
             }
             catch (Exception e)
             {

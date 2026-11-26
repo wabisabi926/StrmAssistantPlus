@@ -7,6 +7,7 @@ using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Services;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using StrmAssistant.Provider;
 using System;
 using System.Collections.Concurrent;
@@ -33,7 +34,7 @@ namespace StrmAssistant.Mod
         internal static void ClearSeriesGroupingCache() => SeriesGroupingCache.Clear();
 
         private static MethodInfo _isEligibleForMultiVersion;
-        private static MethodInfo _canRefreshImage;
+        private static MethodInfo _refreshSingleItem;
         private static MethodInfo _addLibrariesToPresentationUniqueKey;
         private static MethodInfo _getRefreshOptions;
         private static MethodInfo _getVideosGroupedByVersion;
@@ -44,9 +45,12 @@ namespace StrmAssistant.Mod
 
         public MergeMultiVersion()
         {
+            var enabled = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Merge.MergeMultiVersion;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.ExperienceEnhanceStore.GetOptions().Merge.MergeMultiVersion)
+            if (enabled)
             {
                 Patch();
             }
@@ -81,19 +85,20 @@ namespace StrmAssistant.Mod
                     }
                 }
 
-                // 加载 Emby.Providers
+                // 加载 Emby.Providers：4.11 的 CanRefresh 已不存在，改挂 public RefreshSingleItem。
                 var embyProviders = EmbyVersionCompatibility.TryLoadAssembly("Emby.Providers");
                 if (embyProviders != null)
                 {
                     var providerManager = EmbyVersionCompatibility.TryGetType(embyProviders, "Emby.Providers.Manager.ProviderManager");
                     if (providerManager != null)
                     {
-                        _canRefreshImage = providerManager.GetMethod("CanRefresh", BindingFlags.Instance | BindingFlags.NonPublic);
-                        
-                        if (_canRefreshImage != null && Plugin.Instance.DebugMode)
-                        {
-                            Plugin.Instance.Logger.Debug("MergeMultiVersion: CanRefresh method found");
-                        }
+                        _refreshSingleItem = Require(EmbyTargetResolver.ResolveByName(providerManager,
+                            "RefreshSingleItem",
+                            new[]
+                            {
+                                typeof(BaseItem), typeof(MetadataRefreshOptions), typeof(BaseItem[]),
+                                typeof(LibraryOptions), typeof(CancellationToken)
+                            })).Method;
                     }
                 }
 
@@ -111,22 +116,19 @@ namespace StrmAssistant.Mod
                 if (embyApi != null)
                 {
                     var itemRefreshService = EmbyVersionCompatibility.TryGetType(embyApi, "Emby.Api.ItemRefreshService");
-                    if (itemRefreshService != null)
+                    var refreshItemType = embyApi.GetType("Emby.Api.RefreshItem");
+                    if (itemRefreshService != null && refreshItemType != null)
                     {
-                        _getRefreshOptions = itemRefreshService.GetMethod("GetRefreshOptions", 
-                            BindingFlags.Instance | BindingFlags.NonPublic);
-                        
-                        if (_getRefreshOptions != null && Plugin.Instance.DebugMode)
-                        {
-                            Plugin.Instance.Logger.Debug("MergeMultiVersion: GetRefreshOptions method found");
-                        }
+                        _getRefreshOptions = Require(EmbyTargetResolver.ResolveByNameOrSignature(itemRefreshService,
+                            "GetRefreshOptions", new[] { refreshItemType },
+                            typeof(MetadataRefreshOptions), false)).Method;
                     }
                 }
 
                 // 验证所有必需的组件
                 var missingComponents = new List<string>();
                 if (_isEligibleForMultiVersion == null) missingComponents.Add("IsEligibleForMultiVersion");
-                if (_canRefreshImage == null) missingComponents.Add("CanRefresh");
+                if (_refreshSingleItem == null) missingComponents.Add("RefreshSingleItem");
                 if (_addLibrariesToPresentationUniqueKey == null) missingComponents.Add("AddLibrariesToPresentationUniqueKey");
                 if (_getRefreshOptions == null) missingComponents.Add("GetRefreshOptions");
 
@@ -170,7 +172,7 @@ namespace StrmAssistant.Mod
         {
             PatchUnpatch(PatchTracker, apply, _isEligibleForMultiVersion,
                 prefix: nameof(IsEligibleForMultiVersionPrefix));
-            PatchUnpatch(PatchTracker, apply, _canRefreshImage, prefix: nameof(CanRefreshImagePrefix));
+            PatchUnpatch(PatchTracker, apply, _refreshSingleItem, prefix: nameof(RefreshSingleItemPrefix));
             PatchUnpatch(PatchTracker, apply, _addLibrariesToPresentationUniqueKey,
                 prefix: nameof(AddLibrariesToPresentationUniqueKeyPrefix));
             PatchUnpatch(PatchTracker, apply, _getRefreshOptions, postfix: nameof(GetRefreshOptionsPostfix));
@@ -342,8 +344,7 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPrefix]
-        private static void CanRefreshImagePrefix(IImageProvider provider, BaseItem item, LibraryOptions libraryOptions,
-            ImageRefreshOptions refreshOptions, bool ignoreMetadataLock, bool ignoreLibraryOptions)
+        private static void RefreshSingleItemPrefix(BaseItem item)
         {
             if (CurrentAllCollectionFolders.Value != null) return;
 
@@ -374,9 +375,9 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPostfix]
-        private static void GetRefreshOptionsPostfix(IReturnVoid request, MetadataRefreshOptions __result)
+        private static void GetRefreshOptionsPostfix(object __0, MetadataRefreshOptions __result)
         {
-            var id = Traverse.Create(request).Property("Id").GetValue<string>();
+            var id = Traverse.Create(__0).Property("Id").GetValue<string>();
             var item = BaseItem.LibraryManager.GetItemById(id);
 
             if (item is Series || item is Season)
