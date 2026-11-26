@@ -4,6 +4,7 @@ using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -39,22 +40,33 @@ namespace StrmAssistant.Mod
 
         protected override void OnInitialize()
         {
-            var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
-            var sqliteItemRepository =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Data.SqliteItemRepository");
-            _saveChapters = sqliteItemRepository?.GetMethod("SaveChapters",
-                BindingFlags.Instance | BindingFlags.Public, null,
-                new[] { typeof(long), typeof(bool), typeof(List<ChapterInfo>) }, null);
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                Plugin.Instance.Logger.Info(
+                    "IntroMarkerProtector - 4.11: SaveChapters hook skipped; post-refresh marker restore active");
+                return;
+            }
+
+            var repositoryType = EmbyTargetResolver.GetImplementationType(BaseItem.ItemRepository);
+            if (repositoryType == null)
+            {
+                repositoryType = EmbyTargetResolver.FindImplementationType(
+                    Assembly.Load("Emby.Server.Implementations"), typeof(MediaBrowser.Controller.Persistence.IItemRepository));
+            }
+
+            _saveChapters = Require(EmbyTargetResolver.ResolveByName(repositoryType, "SaveChapters",
+                new[] { typeof(long), typeof(bool), typeof(List<ChapterInfo>) })).Method;
 
             if (_saveChapters == null)
             {
                 Plugin.Instance.Logger.Warn(
-                    "IntroMarkerProtector - SqliteItemRepository.SaveChapters not found; marker protection disabled");
+                    "IntroMarkerProtector - IItemRepository.SaveChapters not found; marker protection disabled");
             }
         }
 
         protected override void Prepare(bool apply)
         {
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11) return;
             PatchUnpatch(PatchTracker, apply, _saveChapters, prefix: nameof(SaveChaptersPrefix));
         }
 
@@ -107,6 +119,47 @@ namespace StrmAssistant.Mod
             {
                 // 保护失败不能影响正常章节写入；最坏结果与未启用保护相同
                 Plugin.Instance.Logger.Debug("IntroMarkerProtector - merge failed: " + e.Message);
+            }
+        }
+
+
+        internal static List<ChapterInfo> CaptureProtectedMarkers(BaseItem item)
+        {
+            try
+            {
+                if (item == null) return new List<ChapterInfo>();
+                return BaseItem.ItemRepository.GetChapters(item)?
+                    .Where(c => ProtectedMarkerTypes.Contains(c.MarkerType)).ToList()
+                    ?? new List<ChapterInfo>();
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Debug("IntroMarkerProtector - capture failed: " + e.Message);
+                return new List<ChapterInfo>();
+            }
+        }
+
+        internal static bool RestoreProtectedMarkers(BaseItem item, List<ChapterInfo> cached)
+        {
+            if (item == null || cached == null || cached.Count == 0) return false;
+            if (IsBypassed(item.InternalId)) return false;
+
+            try
+            {
+                var current = BaseItem.ItemRepository.GetChapters(item) ?? new List<ChapterInfo>();
+                var merged = MergeMissingMarkers(current, cached);
+                if (merged.Count == current.Count) return false;
+
+                var added = merged.Count - current.Count;
+                BaseItem.ItemRepository.SaveChapters(item.InternalId, false, merged);
+                Plugin.Instance.Logger.Info(
+                    $"IntroMarkerProtector - restored {added} intro/credits marker(s) after refresh for {item.Name}");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Debug("IntroMarkerProtector - restore failed: " + e.Message);
+                return false;
             }
         }
 

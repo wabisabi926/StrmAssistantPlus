@@ -13,6 +13,7 @@ using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Serialization;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using StrmAssistant.Mod;
 using StrmAssistant.Options;
 using StrmAssistant.Properties;
@@ -45,17 +46,31 @@ namespace StrmAssistant.Common
 
         public static List<string> LibraryPathsInScope;
 
+        public bool IsSupported => PatchTracker.FallbackPatchApproach != PatchApproach.None;
+
         public FingerprintApi(ILibraryManager libraryManager, IFileSystem fileSystem,
             IApplicationPaths applicationPaths, IFfmpegManager ffmpegManager, IMediaEncoder mediaEncoder,
             IMediaMountManager mediaMountManager, IJsonSerializer jsonSerializer, IItemRepository itemRepository,
             IServerApplicationHost serverApplicationHost)
         {
             _logger = Plugin.Instance.Logger;
+            var introOptions = Plugin.Instance.IntroSkipStore.GetOptions();
+            PatchTracker.IsFeatureEnabled =
+                introOptions.Fingerprint.UnlockIntroSkip || introOptions.Playback.EnableIntroSkip;
             _libraryManager = libraryManager;
             _fileSystem = fileSystem;
             _itemRepository = itemRepository;
 
             UpdateLibraryPathsInScope();
+
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                // 4.11 由 MarkerDetector 原生完成片头/片尾检测；旧的指纹生成入口不再存在。
+                PatchTracker.IsSupported = false;
+                PatchTracker.FallbackPatchApproach = PatchApproach.None;
+                _logger.Info("FingerprintApi - disabled on Emby 4.11 (native MarkerDetector pipeline)");
+                return;
+            }
 
             try
             {
@@ -244,7 +259,7 @@ namespace StrmAssistant.Common
             var validLibraryIds = GetValidLibraryIds(currentScope);
             var libraries = _libraryManager.GetVirtualFolders()
                 .Where(f => f.LibraryOptions.EnableMarkerDetection &&
-                            (f.CollectionType == CollectionType.TvShows.ToString() || f.CollectionType is null) &&
+                            (string.Equals(f.CollectionType, CollectionType.TvShows.ToString(), StringComparison.OrdinalIgnoreCase) || f.CollectionType is null) &&
                             (!validLibraryIds.Any() || validLibraryIds.All(id => id == "-1") ||
                              validLibraryIds.Contains(f.Id)))
                 .ToList();

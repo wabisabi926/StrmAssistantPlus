@@ -32,6 +32,13 @@ namespace StrmAssistant.ScheduledTask
         {
             if (!Plugin.IsPluginEnabled) return;
 
+            if (!Plugin.FingerprintApi.IsSupported)
+            {
+                _logger.Info("IntroFingerprintExtract - skipped: fingerprint API is not supported on this Emby build");
+                progress.Report(100.0);
+                return;
+            }
+
             _logger.Info("IntroFingerprintExtract - Scheduled Task Execute");
             
             var unlockIntroSkip = Plugin.Instance.IntroSkipStore.GetOptions().Fingerprint.UnlockIntroSkip;
@@ -328,7 +335,7 @@ namespace StrmAssistant.ScheduledTask
             }
         }
 
-        public string Category => Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+        public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_IntroCredits",
             Plugin.Instance.DefaultUICulture);
 
         public string Key => "IntroFingerprintExtractTask";

@@ -2,15 +2,20 @@
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.MediaInfo;
+using MediaBrowser.Model.Configuration;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using StrmAssistant.ScheduledTask;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
 using System.Threading;
+using System.Threading.Tasks;
 using static StrmAssistant.Mod.PatchManager;
 
 namespace StrmAssistant.Mod
@@ -31,6 +36,13 @@ namespace StrmAssistant.Mod
         private static MethodInfo _logThumbnailImageExtractionFailure;
         private static ConstructorInfo _baseOptionsConstructor;
 
+        // 4.11 path
+        private static MethodInfo _extractVideoImageWithOffset;
+        private static MethodInfo _extractVideoImagesFromList;
+        private static MethodInfo _extractVideoImagesOnInterval;
+        private static MethodInfo _logThumbnailFailure411;
+        private static readonly List<MethodInfo> _providerSupportsTargets = new List<MethodInfo>();
+
         private static readonly AsyncLocal<BaseItem> ShortcutItem = new AsyncLocal<BaseItem>();
         private static readonly AsyncLocal<BaseItem> ImageCaptureItem = new AsyncLocal<BaseItem>();
         private static int _isShortcutPatchUsageCount;
@@ -42,18 +54,31 @@ namespace StrmAssistant.Mod
         {
             SemaphoreFFmpegMaxCount = Plugin.Instance.MainOptionsStore.GetOptions().TaskConcurrency.MaxConcurrentCount;
 
+            var enabled = Plugin.Instance.MediaInfoExtractStore.GetOptions().ImageCapture.EnableImageCapture;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.MediaInfoExtractStore.GetOptions().ImageCapture.EnableImageCapture)
+            if (enabled)
             {
-                SemaphoreFFmpeg = new SemaphoreSlim(SemaphoreFFmpegMaxCount);
-                PatchResourcePool();
-                var resourcePool = (SemaphoreSlim)_resourcePoolField?.GetValue(null);
-
-                if (Plugin.Instance.DebugMode)
+                if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
                 {
-                    Plugin.Instance.Logger.Debug("Current FFmpeg ResourcePool: " + resourcePool?.CurrentCount ??
-                                                 string.Empty);
+                    SemaphoreFFmpeg = new SemaphoreSlim(SemaphoreFFmpegMaxCount);
+                    Plugin.Instance.Logger.Info(
+                        "EnableImageCapture - 4.11 partial mode: position/ISO/shortcut active; " +
+                        "plugin-side FFmpeg semaphore active; -skip_frame unavailable");
+                }
+                else
+                {
+                    SemaphoreFFmpeg = new SemaphoreSlim(SemaphoreFFmpegMaxCount);
+                    PatchResourcePool();
+                    var resourcePool = (SemaphoreSlim)_resourcePoolField?.GetValue(null);
+
+                    if (Plugin.Instance.DebugMode)
+                    {
+                        Plugin.Instance.Logger.Debug("Current FFmpeg ResourcePool: " + resourcePool?.CurrentCount ??
+                                                     string.Empty);
+                    }
                 }
 
                 Patch();
@@ -62,6 +87,12 @@ namespace StrmAssistant.Mod
 
         protected override void OnInitialize()
         {
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                OnInitialize411();
+                return;
+            }
+
             var mediaEncodingAssembly = Assembly.Load("Emby.Server.MediaEncoding");
             var imageExtractorBaseType =
                 mediaEncodingAssembly.GetType("Emby.Server.MediaEncoding.ImageExtraction.ImageExtractorBase");
@@ -132,6 +163,12 @@ namespace StrmAssistant.Mod
 
         protected override void Prepare(bool apply)
         {
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                Prepare411(apply);
+                return;
+            }
+
             PatchUnpatchIsShortcut(apply);
 
             PatchUnpatch(PatchTracker, apply, _supportsVideoImageCapture, prefix: nameof(SupportsImageCapturePrefix),
@@ -148,6 +185,133 @@ namespace StrmAssistant.Mod
                 prefix: nameof(LogThumbnailImageExtractionFailurePrefix));
             PatchUnpatch(PatchTracker, apply, _baseOptionsConstructor, prefix: nameof(BaseOptionsConstructorPrefix));
         }
+
+        private void OnInitialize411()
+        {
+            var mediaEncodingAssembly = Assembly.Load("Emby.Server.MediaEncoding");
+            var managerType = mediaEncodingAssembly.GetType("Emby.Server.MediaEncoding.ImageExtraction.ImageExtractionManager");
+
+            _extractVideoImageWithOffset = Require(EmbyTargetResolver.ResolveByName(managerType, "ExtractVideoImage",
+                new[]
+                {
+                    typeof(MediaSourceInfo), typeof(string), typeof(MediaContainers?), typeof(MediaProtocol),
+                    typeof(MediaStream), typeof(Video3DFormat?), typeof(TimeSpan?), typeof(CancellationToken)
+                })).Method;
+
+            _extractVideoImagesFromList = EmbyTargetResolver.ResolveByName(managerType,
+                "ExtractVideoImagesFromList", null, null, false).Method;
+            _extractVideoImagesOnInterval = EmbyTargetResolver.ResolveByName(managerType,
+                "ExtractVideoImagesOnInterval", null, null, false).Method;
+
+            var repositoryType = EmbyTargetResolver.GetImplementationType(BaseItem.ItemRepository);
+            _logThumbnailFailure411 = EmbyTargetResolver.ResolveByName(repositoryType,
+                "LogThumbnailImageExtractionFailure", new[] { typeof(long), typeof(long) }).Method;
+
+            var supportsThumbnailsProperty = typeof(Video).GetProperty("SupportsThumbnails",
+                BindingFlags.Public | BindingFlags.Instance);
+            _supportsThumbnailsGetter = supportsThumbnailsProperty?.GetGetMethod();
+
+            _providerSupportsTargets.Clear();
+            var seenSupports = new HashSet<MethodInfo>();
+            var providersAssembly = Assembly.Load("Emby.Providers");
+            foreach (var providerType in EmbyTargetResolver.GetLoadableTypes(providersAssembly)
+                         .Where(t => t != null && !t.IsInterface && !t.IsAbstract &&
+                                     !t.ContainsGenericParameters &&
+                                     typeof(IImageProvider).IsAssignableFrom(t)))
+            {
+                foreach (var supports in providerType.GetMethods(
+                             BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                         .Where(m => m.Name == "Supports" && !m.IsAbstract &&
+                                     m.DeclaringType != null && !m.DeclaringType.ContainsGenericParameters &&
+                                     m.GetMethodBody() != null &&
+                                     m.GetParameters().Length == 1 &&
+                                     m.GetParameters()[0].ParameterType == typeof(BaseItem)))
+                {
+                    var declared = supports.DeclaringType?.GetMethod(supports.Name,
+                        BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic,
+                        null, new[] { typeof(BaseItem) }, null) ?? supports;
+                    if (seenSupports.Add(declared)) _providerSupportsTargets.Add(declared);
+                }
+            }
+
+            if (_providerSupportsTargets.Count == 0)
+            {
+                Require(TargetResolution.Missing("IImageProvider.Supports(BaseItem)", "no image provider found"));
+            }
+        }
+
+        private void Prepare411(bool apply)
+        {
+            PatchUnpatch(PatchTracker, apply, _extractVideoImageWithOffset,
+                prefix: nameof(ExtractVideoImage411Prefix));
+
+            if (_extractVideoImagesFromList != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _extractVideoImagesFromList,
+                    prefix: nameof(ExtractImagesPath411Prefix));
+            }
+
+            if (_extractVideoImagesOnInterval != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _extractVideoImagesOnInterval,
+                    prefix: nameof(ExtractImagesPath411Prefix));
+            }
+
+            foreach (var target in _providerSupportsTargets)
+            {
+                PatchUnpatch(PatchTracker, apply, target, prefix: nameof(SupportsShortcut411Prefix));
+            }
+
+            if (_logThumbnailFailure411 != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _logThumbnailFailure411,
+                    prefix: nameof(LogThumbnailFailure411Prefix));
+            }
+
+            if (_supportsThumbnailsGetter != null)
+            {
+                PatchUnpatch(PatchTracker, apply, _supportsThumbnailsGetter,
+                    prefix: nameof(SupportsThumbnailsGetterPrefix),
+                    postfix: nameof(SupportsThumbnailsGetterPostfix),
+                    finalizer: nameof(SupportsThumbnailsGetterFinalizer));
+            }
+        }
+
+        [HarmonyPrefix]
+        private static void ExtractVideoImage411Prefix(MediaSourceInfo mediaSource, ref string inputPath,
+            ref TimeSpan? offset)
+        {
+            RewriteIsoInput(ref inputPath);
+
+            if (!offset.HasValue) return;
+            if (!mediaSource?.RunTimeTicks.HasValue ?? true) return;
+            if (mediaSource.RunTimeTicks.Value <= 0) return;
+
+            offset = TimeSpan.FromTicks(GetThumbnailPositionTicks(mediaSource.RunTimeTicks.Value));
+        }
+
+        [HarmonyPrefix]
+        private static void ExtractImagesPath411Prefix(ref string inputPath)
+        {
+            RewriteIsoInput(ref inputPath);
+        }
+
+        [HarmonyPrefix]
+        private static bool SupportsShortcut411Prefix(BaseItem item, ref bool __result)
+        {
+            if (item != null && ImageCaptureItem.Value != null &&
+                ImageCaptureItem.Value.InternalId == item.InternalId &&
+                Plugin.Instance.MediaInfoExtractStore.GetOptions().ImageCapture.EnableImageCapture)
+            {
+                __result = true;
+                return false;
+            }
+
+            return true;
+        }
+
+        [HarmonyPrefix]
+        private static bool LogThumbnailFailure411Prefix() => false;
 
         private static void PatchResourcePool()
         {
@@ -276,6 +440,8 @@ namespace StrmAssistant.Mod
 
         public static void PatchUnpatchIsShortcut(bool apply)
         {
+            if (_isShortcutGetter == null) return;
+
             PatchUnpatch(Instance.PatchTracker, apply, _isShortcutGetter, ref _isShortcutPatchUsageCount,
                 prefix: nameof(IsShortcutPrefix));
         }
@@ -283,6 +449,98 @@ namespace StrmAssistant.Mod
         public static void AllowImageCaptureInstance(BaseItem item)
         {
             ImageCaptureItem.Value = item;
+        }
+
+        /// <summary>
+        /// 4.11 直接抽帧兜底：Emby 4.11 没有可用的 Image Capture provider 调用链时，
+        /// 在媒体信息提取完成后直接调用 IImageExtractionManager，并把结果保存为 PrimaryImage。
+        /// </summary>
+        public static async Task<bool> TryExtractPrimaryImage(BaseItem item, LibraryOptions libraryOptions,
+            CancellationToken cancellationToken)
+        {
+            if (EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11) return false;
+            if (!(item is Video video) || video.HasImage(ImageType.Primary)) return false;
+            if (Plugin.Instance.ImageExtractionManager == null)
+            {
+                Plugin.Instance.Logger.Warn("EnableImageCapture - direct extraction unavailable: manager null");
+                return false;
+            }
+
+            var mediaSources = Plugin.MediaInfoApi.GetStaticMediaSources(item, true);
+            var mediaSource = mediaSources?.FirstOrDefault();
+            if (mediaSource == null)
+            {
+                Plugin.Instance.Logger.Warn($"EnableImageCapture - direct extraction unavailable: no media source ({mediaSources?.Count ?? 0})");
+                return false;
+            }
+
+            var videoStream = mediaSource.MediaStreams?.FirstOrDefault(s => s.Type == MediaStreamType.Video)
+                              ?? new MediaStream { Type = MediaStreamType.Video, Index = 0 };
+
+            var runtimeTicks = mediaSource.RunTimeTicks ?? item.RunTimeTicks ?? 0L;
+            var offset = runtimeTicks > 0
+                ? TimeSpan.FromTicks(GetThumbnailPositionTicks(runtimeTicks))
+                : TimeSpan.FromSeconds(10);
+
+            var inputPath = mediaSource.Path ?? item.Path;
+            if (string.IsNullOrEmpty(inputPath)) return false;
+
+            if (_extractVideoImageWithOffset == null)
+            {
+                Plugin.Instance.Logger.Warn("EnableImageCapture - direct extraction unavailable: method null");
+                return false;
+            }
+
+            if (SemaphoreFFmpeg == null) SemaphoreFFmpeg = new SemaphoreSlim(SemaphoreFFmpegMaxCount);
+            await SemaphoreFFmpeg.WaitAsync(cancellationToken).ConfigureAwait(false);
+            string imagePath;
+            try
+            {
+                var extractionTask = _extractVideoImageWithOffset.Invoke(Plugin.Instance.ImageExtractionManager,
+                    new object[]
+                    {
+                        mediaSource, inputPath, item.MediaContainer, mediaSource.Protocol, videoStream,
+                        null, offset, cancellationToken
+                    }) as Task<string>;
+                if (extractionTask == null) return false;
+                imagePath = await extractionTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                SemaphoreFFmpeg.Release();
+            }
+
+            if (string.IsNullOrEmpty(imagePath) || !File.Exists(imagePath))
+            {
+                Plugin.Instance.Logger.Warn($"EnableImageCapture - direct extraction returned no image: {imagePath}");
+                return false;
+            }
+
+
+            try
+            {
+                var directoryService = Plugin.MediaInfoApi.GetMediaInfoRefreshOptions().DirectoryService;
+                using (var stream = File.OpenRead(imagePath))
+                {
+                    await BaseItem.ProviderManager.SaveImage(item, libraryOptions, stream,
+                        "image/jpeg".AsMemory(), ImageType.Primary, 0, Array.Empty<long>(), directoryService, true,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
+                Plugin.Instance.Logger.Info(
+                    $"EnableImageCapture - direct extraction saved primary image for {item.Name}");
+                return item.HasImage(ImageType.Primary);
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Warn($"EnableImageCapture - direct extraction save failed: {e.Message}");
+                Plugin.Instance.Logger.Debug(e.StackTrace);
+                return false;
+            }
+            finally
+            {
+                try { File.Delete(imagePath); } catch { }
+            }
         }
 
         public static void PatchIsShortcutInstance(BaseItem item)

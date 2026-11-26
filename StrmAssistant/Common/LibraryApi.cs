@@ -1151,6 +1151,10 @@ namespace StrmAssistant.Common
                 (persistOverride ?? (persistMediaInfoMode != PersistMediaInfoOption.None.ToString()));
             var mediaInfoRestoreMode = persistMediaInfoMode == PersistMediaInfoOption.Restore.ToString();
             var enableImageCapture = Plugin.Instance.MediaInfoExtractStore.GetOptions().ImageCapture.EnableImageCapture;
+            var protectedMarkers = EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11 &&
+                                   (taskItem is Episode || taskItem is Movie)
+                ? StrmAssistant.Mod.IntroMarkerProtector.CaptureProtectedMarkers(taskItem)
+                : null;
 
             ExclusiveExtract.AllowExtractInstance(taskItem);
 
@@ -1162,7 +1166,11 @@ namespace StrmAssistant.Common
                 filePath = await GetStrmMountPath(filePath).ConfigureAwait(false);
             }
 
-            if (string.IsNullOrEmpty(filePath)) return null;
+            if (string.IsNullOrEmpty(filePath))
+            {
+                StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);
+                return null;
+            }
 
             var fileExtension = Path.GetExtension(filePath).TrimStart('.');
             var extractSkip = mediaInfoRestoreMode || ExcludeMediaExtensions.Contains(fileExtension);
@@ -1175,7 +1183,11 @@ namespace StrmAssistant.Common
                 uri.Scheme == Uri.UriSchemeFile)
             {
                 var file = directoryService.GetFile(filePath);
-                if (file?.Exists != true) return null;
+                if (file?.Exists != true)
+                {
+                    StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);
+                    return null;
+                }
             }
 
             var collectionFolders = (BaseItem[])_libraryManager.GetCollectionFolders(taskItem);
@@ -1190,8 +1202,8 @@ namespace StrmAssistant.Common
                 option.MetadataFetchers = Array.Empty<string>();
             }
 
-            if ((forceProbe || !extractSkip) && enableImageCapture && !taskItem.HasImage(ImageType.Primary) &&
-                ImageCaptureEnabled(taskItem, libraryOptions))
+            if ((forceProbe || !extractSkip) && enableImageCapture &&
+                !taskItem.HasImage(ImageType.Primary) && ImageCaptureEnabled(taskItem, libraryOptions))
             {
                 EnableImageCapture.AllowImageCaptureInstance(taskItem);
 
@@ -1203,6 +1215,18 @@ namespace StrmAssistant.Common
                 await _providerManager
                     .RefreshSingleItem(taskItem, refreshOptions, collectionFolders, dummyLibraryOptions,
                         cancellationToken).ConfigureAwait(false);
+
+                if (!taskItem.HasImage(ImageType.Primary))
+                {
+                    await EnableImageCapture.TryExtractPrimaryImage(taskItem, libraryOptions, cancellationToken)
+                        .ConfigureAwait(false);
+                }
+
+                if (taskItem.HasImage(ImageType.Primary))
+                {
+                    await ApplyDirectCapturePostProcessAsync(taskItem, cancellationToken)
+                        .ConfigureAwait(false);
+                }
             }
             else
             {
@@ -1225,11 +1249,16 @@ namespace StrmAssistant.Common
                                 .UpdateExternalSubtitles(taskItem, refreshOptions, false, true).ConfigureAwait(false);
                         }
 
+                        StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);
                         return false;
                     }
                 }
 
-                if (!forceProbe && extractSkip) return null;
+                if (!forceProbe && extractSkip)
+                {
+                    StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);
+                    return null;
+                }
 
                 foreach (var option in dummyLibraryOptions.TypeOptions)
                 {
@@ -1249,7 +1278,40 @@ namespace StrmAssistant.Common
                     .ConfigureAwait(false);
             }
 
+            StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);
             return true;
+        }
+
+        private static async Task ApplyDirectCapturePostProcessAsync(BaseItem item, CancellationToken cancellationToken)
+        {
+            var imageCapture = Plugin.Instance.MediaInfoExtractStore.GetOptions().ImageCapture;
+
+            if (Plugin.ImagePostProcessor == null || !imageCapture.EnableImageCapture ||
+                string.IsNullOrWhiteSpace(imageCapture.ImageCapturePostProcessMode))
+            {
+                return;
+            }
+
+            var postProcessItem = item.HasImage(ImageType.Primary)
+                ? item
+                : BaseItem.ItemRepository.GetItemById(item.InternalId) ?? item;
+
+            if (!postProcessItem.HasImage(ImageType.Primary)) return;
+
+            try
+            {
+                await Task.Run(() => Plugin.ImagePostProcessor.ProcessItem(postProcessItem,
+                    imageCapture.ImageCapturePostProcessMode), cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            catch (Exception e)
+            {
+                Plugin.Instance.Logger.Warn(
+                    "ImagePostProcess - direct capture post-processing failed: " + e.Message);
+                Plugin.Instance.Logger.Debug(e.StackTrace);
+            }
         }
 
         public static LibraryOptions CopyLibraryOptions(LibraryOptions sourceOptions)
@@ -1538,10 +1600,22 @@ namespace StrmAssistant.Common
             var libraries = _libraryManager
                 .GetItemList(new InternalItemsQuery { IncludeItemTypes = new[] { nameof(CollectionFolder) } })
                 .OfType<CollectionFolder>()
-                .Where(l => l.CollectionType == CollectionType.Movies.ToString() || l.CollectionType is null)
+                .Where(l => string.Equals(l.CollectionType, CollectionType.Movies.ToString(), StringComparison.OrdinalIgnoreCase) || l.CollectionType is null)
                 .ToList();
 
             return libraries;
+        }
+
+        internal static void SetSingleParent(InternalItemsQuery query, long parentId)
+        {
+            var parentIdProperty = typeof(InternalItemsQuery).GetProperty("ParentId");
+            if (parentIdProperty != null)
+            {
+                parentIdProperty.SetValue(query, parentId);
+                return;
+            }
+
+            query.ParentIds = new[] { parentId };
         }
 
         public List<CollectionFolder> GetSeriesLibraries()
@@ -1549,7 +1623,7 @@ namespace StrmAssistant.Common
             var libraries = _libraryManager
                 .GetItemList(new InternalItemsQuery { IncludeItemTypes = new[] { nameof(CollectionFolder) } })
                 .OfType<CollectionFolder>()
-                .Where(l => l.CollectionType == CollectionType.TvShows.ToString() || l.CollectionType is null)
+                .Where(l => string.Equals(l.CollectionType, CollectionType.TvShows.ToString(), StringComparison.OrdinalIgnoreCase) || l.CollectionType is null)
                 .ToList();
 
             return libraries;
@@ -1565,15 +1639,17 @@ namespace StrmAssistant.Common
 
             var libraryIds = libraries.Select(l => l.InternalId).ToArray();
 
-            var movieQuery = new InternalItemsQuery
+            var altMovies = libraryIds.SelectMany(libraryId =>
             {
-                Recursive = true,
-                ParentIds = libraryIds,
-                GroupByPresentationUniqueKey = true,
-                IncludeItemTypes = new[] { nameof(Movie) }
-            };
-
-            var altMovies = _libraryManager.GetItemList(movieQuery).Cast<Movie>()
+                var query = new InternalItemsQuery
+                {
+                    Recursive = true,
+                    GroupByPresentationUniqueKey = true,
+                    IncludeItemTypes = new[] { nameof(Movie) }
+                };
+                SetSingleParent(query, libraryId);
+                return _libraryManager.GetItemList(query);
+            }).Cast<Movie>()
                 .Where(m => m.GetAlternateVersionIds().Count > 0).ToList();
 
             return altMovies;

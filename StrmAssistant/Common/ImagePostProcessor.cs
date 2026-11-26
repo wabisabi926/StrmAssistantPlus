@@ -9,6 +9,7 @@ using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
 using StrmAssistant.Options;
 using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -68,10 +69,27 @@ namespace StrmAssistant.Common
         /// 并按需从截帧额外生成背景图。
         /// 仅处理 Emby 内部元数据目录中服务器生成的图片，用户本地图片不受影响。
         /// </summary>
+        private static readonly ConcurrentDictionary<long, SemaphoreSlim> ProcessGates =
+            new ConcurrentDictionary<long, SemaphoreSlim>();
+
         public void ProcessItem(BaseItem item, string postProcessModes)
         {
             if (item == null || string.IsNullOrWhiteSpace(postProcessModes)) return;
 
+            var gate = ProcessGates.GetOrAdd(item.InternalId, _ => new SemaphoreSlim(1, 1));
+            gate.Wait();
+            try
+            {
+                ProcessItemCore(item, postProcessModes);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private void ProcessItemCore(BaseItem item, string postProcessModes)
+        {
             var modes = postProcessModes
                 .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                 .Select(m => m.Trim())
@@ -190,6 +208,7 @@ namespace StrmAssistant.Common
                             Array.Empty<long>(), directoryService, false, CancellationToken.None)
                         .GetAwaiter().GetResult();
 
+                    item.UpdateToRepository(ItemUpdateType.ImageUpdate);
                     _logger.Info("ImagePostProcess - Generated backdrop from captured image for {0}", item.Name);
                 }
                 finally

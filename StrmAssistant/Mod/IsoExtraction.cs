@@ -2,6 +2,7 @@
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -52,9 +53,12 @@ namespace StrmAssistant.Mod
 
         public IsoExtraction()
         {
+            var enabled = Plugin.Instance.MediaInfoExtractStore.GetOptions().IsoTool.EnableIsoExtraction;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
-            if (Plugin.Instance.MediaInfoExtractStore.GetOptions().IsoTool.EnableIsoExtraction)
+            if (enabled)
             {
                 Patch();
             }
@@ -67,9 +71,14 @@ namespace StrmAssistant.Mod
                 var assembly = Assembly.Load("Emby.Server.MediaEncoding");
                 var probeManager = assembly.GetType("Emby.Server.MediaEncoding.Probing.MediaProbeManager");
 
-                _getMediaInfoInternal = probeManager?
-                    .GetMethods(BindingFlags.Instance | BindingFlags.NonPublic)
-                    .FirstOrDefault(m => m.Name == "GetMediaInfoInternal" && m.GetParameters().Length == 7);
+                // 4.11 的方法名被混淆，但 7 参签名稳定；先按名找（4.9/4.10），再按签名找（4.11）。
+                _getMediaInfoInternal = Require(EmbyTargetResolver.ResolveByNameOrSignature(probeManager,
+                    "GetMediaInfoInternal",
+                    new[]
+                    {
+                        typeof(MediaBrowser.Model.Dto.MediaSourceInfo), typeof(string), typeof(string),
+                        typeof(MediaProtocol), typeof(bool), typeof(bool), typeof(System.Threading.CancellationToken)
+                    }, typeof(Task<ProbeMediaInfo>), false)).Method;
 
                 if (_getMediaInfoInternal == null)
                 {
@@ -80,9 +89,8 @@ namespace StrmAssistant.Mod
                 // FFProbeProvider.IsSupported(string path, MediaProtocol protocol) —— 解锁 .iso 闸门
                 var providers = Assembly.Load("Emby.Providers");
                 var ffProbeProvider = providers.GetType("Emby.Providers.MediaInfo.FFProbeProvider");
-                _isSupported = ffProbeProvider?
-                    .GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
-                    .FirstOrDefault(m => m.Name == "IsSupported" && m.GetParameters().Length == 2);
+                _isSupported = Require(EmbyTargetResolver.ResolveByNameOrSignature(ffProbeProvider,
+                    "IsSupported", new[] { typeof(string), typeof(MediaProtocol) }, typeof(bool), true)).Method;
 
                 if (_isSupported == null)
                 {
@@ -120,13 +128,13 @@ namespace StrmAssistant.Mod
         /// 解锁 Emby 对 .iso 的探测闸门：仅当选项开启且目标为 .iso 时跳过原实现、直接返回 true。
         /// </summary>
         [HarmonyPrefix]
-        private static bool IsSupportedPrefix(string path, MediaProtocol protocol, ref bool __result)
+        private static bool IsSupportedPrefix(string __0, MediaProtocol __1, ref bool __result)
         {
             try
             {
                 if (Plugin.Instance.MediaInfoExtractStore.GetOptions().IsoTool.EnableIsoExtraction &&
-                    !string.IsNullOrWhiteSpace(path) &&
-                    IsoMounter.LooksLikeIsoPath(path))
+                    !string.IsNullOrWhiteSpace(__0) &&
+                    IsoMounter.LooksLikeIsoPath(__0))
                 {
                     __result = true;
                     return false;
@@ -141,9 +149,31 @@ namespace StrmAssistant.Mod
         }
 
         [HarmonyPrefix]
-        private static void GetMediaInfoInternalPrefix(ref string inputPath, ref MediaProtocol protocol, out IsoMounter.TitleHint __state)
+        private static void GetMediaInfoInternalPrefix(object[] __args, out IsoMounter.TitleHint __state)
         {
             __state = null;
+            if (__args == null) return;
+
+            var inputIndex = -1;
+            var protocolIndex = -1;
+            var inputPath = default(string);
+            var protocol = default(MediaProtocol);
+
+            for (var i = 0; i < __args.Length; i++)
+            {
+                if (inputIndex < 0 && __args[i] is string value)
+                {
+                    inputIndex = i;
+                    inputPath = value;
+                }
+                else if (protocolIndex < 0 && __args[i] is MediaProtocol mediaProtocol)
+                {
+                    protocolIndex = i;
+                    protocol = mediaProtocol;
+                }
+            }
+
+            if (inputIndex < 0) return;
 
             try
             {
@@ -212,6 +242,11 @@ namespace StrmAssistant.Mod
             {
                 // 保持原路径，不影响常规探测
                 __state = null;
+            }
+            finally
+            {
+                __args[inputIndex] = inputPath;
+                if (protocolIndex >= 0) __args[protocolIndex] = protocol;
             }
         }
 

@@ -11,6 +11,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
 using MediaBrowser.Model.Services;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -60,6 +61,7 @@ namespace StrmAssistant.Mod
         private static MethodInfo _deleteChapters;
 
         private static MethodInfo _getRefreshOptions;
+        private static MethodInfo _refreshSingleItem;
 
         private static readonly AsyncLocal<bool> ShouldCleanEmbeddedMetadata = new AsyncLocal<bool>();
         private static readonly AsyncLocal<long> ExclusiveItem = new AsyncLocal<long>();
@@ -68,11 +70,14 @@ namespace StrmAssistant.Mod
 
         public ExclusiveExtract()
         {
+            var enabled = Plugin.Instance.MediaInfoExtractStore.GetOptions().ExtractionPerformance.ExclusiveExtract;
+            PatchTracker.IsFeatureEnabled = enabled;
+
             Initialize();
 
             PatchFfProbeProcess();
 
-            if (Plugin.Instance.MediaInfoExtractStore.GetOptions().ExtractionPerformance.ExclusiveExtract)
+            if (enabled)
             {
                 Patch();
             }
@@ -85,77 +90,125 @@ namespace StrmAssistant.Mod
             _canRefreshMetadata = providerManager.GetMethod("CanRefresh", BindingFlags.Static | BindingFlags.NonPublic);
             _canRefreshImage = providerManager.GetMethod("CanRefresh", BindingFlags.Instance | BindingFlags.NonPublic);
             var itemImageProvider = embyProviders.GetType("Emby.Providers.Manager.ItemImageProvider");
-            _clearImages = itemImageProvider.GetMethod("ClearImages", BindingFlags.Instance | BindingFlags.NonPublic);
+            _clearImages = itemImageProvider?.GetMethod("ClearImages", BindingFlags.Instance | BindingFlags.NonPublic);
             _isSaverEnabledForItem =
                 providerManager.GetMethod("IsSaverEnabledForItem", BindingFlags.Instance | BindingFlags.NonPublic);
             _afterMetadataRefresh =
                 typeof(BaseItem).GetMethod("AfterMetadataRefresh", BindingFlags.Instance | BindingFlags.Public);
             var fFProbeProvider = embyProviders.GetType("Emby.Providers.MediaInfo.FFProbeProvider");
             _isProbingAllowed =
-                fFProbeProvider.GetMethod("IsProbingAllowed", BindingFlags.Static | BindingFlags.NonPublic);
+                fFProbeProvider?.GetMethod("IsProbingAllowed", BindingFlags.Static | BindingFlags.NonPublic);
 
             var mediaEncodingAssembly = Assembly.Load("Emby.Server.MediaEncoding");
             var mediaProbeManager =
                 mediaEncodingAssembly.GetType("Emby.Server.MediaEncoding.Probing.MediaProbeManager");
             _runFfProcess =
-                mediaProbeManager.GetMethod("RunFfProcess", BindingFlags.Instance | BindingFlags.NonPublic);
+                mediaProbeManager?.GetMethod("RunFfProcess", BindingFlags.Instance | BindingFlags.NonPublic);
             var encodingHelpers = mediaEncodingAssembly.GetType("Emby.Server.MediaEncoding.Encoder.EncodingHelpers");
             _getInputArgument =
-                encodingHelpers.GetMethod("GetInputArgument", BindingFlags.Static | BindingFlags.Public);
+                encodingHelpers?.GetMethod("GetInputArgument", BindingFlags.Static | BindingFlags.Public);
             var probeResultNormalizer =
                 mediaEncodingAssembly.GetType("Emby.Server.MediaEncoding.Probing.ProbeResultNormalizer");
             _getMediaInfo =
-                probeResultNormalizer.GetMethod("GetMediaInfo", BindingFlags.Instance | BindingFlags.Public);
+                probeResultNormalizer?.GetMethod("GetMediaInfo", BindingFlags.Instance | BindingFlags.Public);
 
             var embyApi = Assembly.Load("Emby.Api");
             var libraryStructureService = embyApi.GetType("Emby.Api.Library.LibraryStructureService");
-            _addVirtualFolder = libraryStructureService.GetMethod("Post",
+            _addVirtualFolder = libraryStructureService?.GetMethod("Post",
                 new[] { embyApi.GetType("Emby.Api.Library.AddVirtualFolder") });
-            _removeVirtualFolder = libraryStructureService.GetMethod("Any",
+            _removeVirtualFolder = libraryStructureService?.GetMethod("Any",
                 new[] { embyApi.GetType("Emby.Api.Library.RemoveVirtualFolder") });
-            _addMediaPath = libraryStructureService.GetMethod("Post",
+            _addMediaPath = libraryStructureService?.GetMethod("Post",
                 new[] { embyApi.GetType("Emby.Api.Library.AddMediaPath") });
-            _removeMediaPath = libraryStructureService.GetMethod("Any",
+            _removeMediaPath = libraryStructureService?.GetMethod("Any",
                 new[] { embyApi.GetType("Emby.Api.Library.RemoveMediaPath") });
             
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
             var sqliteItemRepository =
-                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Data.SqliteItemRepository");
-            _saveChapters = sqliteItemRepository.GetMethod("SaveChapters",
+                embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Data.SqliteItemRepository") ??
+                EmbyTargetResolver.FindImplementationType(embyServerImplementationsAssembly,
+                    typeof(MediaBrowser.Controller.Persistence.IItemRepository));
+            _saveChapters = sqliteItemRepository?.GetMethod("SaveChapters",
                 BindingFlags.Instance | BindingFlags.Public, null,
                 new[] { typeof(long), typeof(bool), typeof(List<ChapterInfo>) }, null);
-            _deleteChapters =
-                sqliteItemRepository.GetMethod("DeleteChapters", BindingFlags.Instance | BindingFlags.Public);
+            _deleteChapters = sqliteItemRepository?.GetMethod("DeleteChapters",
+                BindingFlags.Instance | BindingFlags.Public, null,
+                new[] { typeof(long), typeof(MarkerType[]) }, null);
 
             var itemRefreshService = embyApi.GetType("Emby.Api.ItemRefreshService");
             _getRefreshOptions =
-                itemRefreshService.GetMethod("GetRefreshOptions", BindingFlags.Instance | BindingFlags.NonPublic);
+                itemRefreshService?.GetMethod("GetRefreshOptions", BindingFlags.Instance | BindingFlags.NonPublic) ??
+                EmbyTargetResolver.ResolveBySignature(itemRefreshService,
+                    new[] { embyApi.GetType("Emby.Api.RefreshItem") },
+                    typeof(MetadataRefreshOptions), false).Method;
+
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                // 4.11 移除了 CanRefresh/IsSaverEnabledForItem/IsProbingAllowed/RunFfProcess，
+                // 以及 QueueNotification 同类内部队列；保留仍可按签名定位的章节/刷新钩子。
+                _canRefreshMetadata = null;
+                _canRefreshImage = null;
+                _clearImages = null;
+                _isSaverEnabledForItem = null;
+                _isProbingAllowed = null;
+                _runFfProcess = null;
+                _getInputArgument = null;
+
+                _refreshSingleItem = EmbyTargetResolver.ResolveByName(providerManager, "RefreshSingleItem",
+                    new[]
+                    {
+                        typeof(BaseItem), typeof(MetadataRefreshOptions), typeof(BaseItem[]),
+                        typeof(LibraryOptions), typeof(CancellationToken)
+                    }).Method;
+
+                Plugin.Instance.Logger.Info(
+                    "ExclusiveExtract - 4.11 limited mode: refresh interception targets removed; native chapter transaction, content-probe cleanup and alternate-version hooks active");
+            }
         }
 
         protected override void Prepare(bool apply)
         {
-            PatchUnpatch(PatchTracker, apply, _canRefreshImage, prefix: nameof(CanRefreshImagePrefix));
-            PatchUnpatch(PatchTracker, apply, _canRefreshMetadata, prefix: nameof(CanRefreshMetadataPrefix),
-                postfix: nameof(CanRefreshMetadataPostfix));
-            PatchUnpatch(PatchTracker, apply, _clearImages, prefix: nameof(ClearImagesPrefix));
-            PatchUnpatch(PatchTracker, apply, _isSaverEnabledForItem, prefix: nameof(IsSaverEnabledForItemPrefix));
-            PatchUnpatch(PatchTracker, apply, _afterMetadataRefresh, prefix: nameof(AfterMetadataRefreshPrefix));
-            PatchUnpatch(PatchTracker, apply, _addVirtualFolder, prefix: nameof(RefreshLibraryPrefix));
-            PatchUnpatch(PatchTracker, apply, _removeVirtualFolder, prefix: nameof(RefreshLibraryPrefix));
-            PatchUnpatch(PatchTracker, apply, _addMediaPath, prefix: nameof(RefreshLibraryPrefix));
-            PatchUnpatch(PatchTracker, apply, _removeMediaPath, prefix: nameof(RefreshLibraryPrefix));
-            PatchUnpatch(PatchTracker, apply, _saveChapters, prefix: nameof(SaveChaptersPrefix));
-            PatchUnpatch(PatchTracker, apply, _deleteChapters, prefix: nameof(DeleteChaptersPrefix));
-            PatchUnpatch(PatchTracker, apply, _getRefreshOptions, postfix: nameof(GetRefreshOptionsPostfix));
+            if (_canRefreshImage != null)
+                PatchUnpatch(PatchTracker, apply, _canRefreshImage, prefix: nameof(CanRefreshImagePrefix));
+            if (_canRefreshMetadata != null)
+                PatchUnpatch(PatchTracker, apply, _canRefreshMetadata, prefix: nameof(CanRefreshMetadataPrefix),
+                    postfix: nameof(CanRefreshMetadataPostfix));
+            if (_clearImages != null)
+                PatchUnpatch(PatchTracker, apply, _clearImages, prefix: nameof(ClearImagesPrefix));
+            if (_isSaverEnabledForItem != null)
+                PatchUnpatch(PatchTracker, apply, _isSaverEnabledForItem, prefix: nameof(IsSaverEnabledForItemPrefix));
+            if (_afterMetadataRefresh != null)
+                PatchUnpatch(PatchTracker, apply, _afterMetadataRefresh, prefix: nameof(AfterMetadataRefreshPrefix));
+            if (_addVirtualFolder != null)
+                PatchUnpatch(PatchTracker, apply, _addVirtualFolder, prefix: nameof(RefreshLibraryPrefix));
+            if (_removeVirtualFolder != null)
+                PatchUnpatch(PatchTracker, apply, _removeVirtualFolder, prefix: nameof(RefreshLibraryPrefix));
+            if (_addMediaPath != null)
+                PatchUnpatch(PatchTracker, apply, _addMediaPath, prefix: nameof(RefreshLibraryPrefix));
+            if (_removeMediaPath != null)
+                PatchUnpatch(PatchTracker, apply, _removeMediaPath, prefix: nameof(RefreshLibraryPrefix));
+            if (_saveChapters != null && EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11)
+                PatchUnpatch(PatchTracker, apply, _saveChapters, prefix: nameof(SaveChaptersPrefix));
+            if (_deleteChapters != null)
+                PatchUnpatch(PatchTracker, apply, _deleteChapters, prefix: nameof(DeleteChaptersPrefix));
+            if (_getRefreshOptions != null)
+                PatchUnpatch(PatchTracker, apply, _getRefreshOptions, postfix: nameof(GetRefreshOptionsPostfix));
+            if (_refreshSingleItem != null)
+                PatchUnpatch(PatchTracker, apply, _refreshSingleItem,
+                    prefix: nameof(RefreshSingleItem411Prefix), postfix: nameof(RefreshSingleItem411Postfix));
         }
 
         private void PatchFfProbeProcess()
         {
-            PatchUnpatch(PatchTracker, true, _runFfProcess, prefix: nameof(RunFfProcessPrefix),
-                finalizer: nameof(RunFfProcessFinalizer));
-            PatchUnpatch(PatchTracker, true, _getInputArgument, prefix: nameof(GetInputArgumentPrefix));
-            PatchUnpatch(PatchTracker, true, _isProbingAllowed, prefix: nameof(IsProbingAllowedPrefix));
-            PatchUnpatch(PatchTracker, true, _getMediaInfo, postfix: nameof(GetMediaInfoPostfix));
+            if (_runFfProcess != null)
+                PatchUnpatch(PatchTracker, true, _runFfProcess, prefix: nameof(RunFfProcessPrefix),
+                    finalizer: nameof(RunFfProcessFinalizer));
+            if (_getInputArgument != null)
+                PatchUnpatch(PatchTracker, true, _getInputArgument, prefix: nameof(GetInputArgumentPrefix));
+            if (_isProbingAllowed != null)
+                PatchUnpatch(PatchTracker, true, _isProbingAllowed, prefix: nameof(IsProbingAllowedPrefix));
+            if (_getMediaInfo != null)
+                PatchUnpatch(PatchTracker, true, _getMediaInfo, postfix: nameof(GetMediaInfoPostfix));
         }
 
         public static void AllowExtractInstance(BaseItem item)
@@ -576,10 +629,25 @@ namespace StrmAssistant.Mod
             return true;
         }
 
-        [HarmonyPostfix]
-        private static void GetRefreshOptionsPostfix(IReturnVoid request, MetadataRefreshOptions __result)
+        [HarmonyPrefix]
+        private static void RefreshSingleItem411Prefix(BaseItem __0)
         {
-            var id = Traverse.Create(request).Property("Id").GetValue<string>();
+            if (__0 is Movie || __0 is Episode)
+            {
+                ShouldCleanEmbeddedMetadata.Value = true;
+            }
+        }
+
+        [HarmonyPostfix]
+        private static void RefreshSingleItem411Postfix()
+        {
+            ShouldCleanEmbeddedMetadata.Value = false;
+        }
+
+        [HarmonyPostfix]
+        private static void GetRefreshOptionsPostfix(object __0, MetadataRefreshOptions __result)
+        {
+            var id = Traverse.Create(__0).Property("Id").GetValue<string>();
             var item = BaseItem.LibraryManager.GetItemById(id);
 
             Plugin.MediaInfoApi.QueueRefreshAlternateVersions(item, __result, true);
