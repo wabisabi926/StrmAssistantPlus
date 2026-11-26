@@ -16,9 +16,9 @@ namespace StrmAssistant.Tests
             "IntroSkipOptions_UnlockIntroSkip_Unlock_Strm_support_for_built_in_intro_skip_detection";
 
         [Theory]
-        [InlineData("zh-CN", FingerprintKey, "当前 Emby 已提供原生片头检测时，此任务不执行")]
-        [InlineData("zh-Hant", FingerprintKey, "目前 Emby 已提供原生片頭偵測時，此工作不執行")]
-        [InlineData("en-US", FingerprintKey, "does not run when Emby provides native intro detection")]
+        [InlineData("zh-CN", FingerprintKey, "指纹接口不可用或未启用片头检测增强时不执行")]
+        [InlineData("zh-Hant", FingerprintKey, "指紋介面不可用或未啟用片頭偵測增強時不執行")]
+        [InlineData("en-US", FingerprintKey, "fingerprint API is unavailable or intro detection enhancement is disabled")]
         [InlineData("zh-CN", BoxSetsKey, "从用户视图隐藏合集媒体库，并阻止可拦截的自动创建")]
         [InlineData("zh-Hant", BoxSetsKey, "從使用者檢視隱藏合集媒體庫，並阻止可攔截的自動建立")]
         [InlineData("en-US", BoxSetsKey, "blocks auto-creation where Emby allows interception")]

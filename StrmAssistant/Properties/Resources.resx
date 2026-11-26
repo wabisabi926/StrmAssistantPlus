@@ -378,10 +378,10 @@
     <value>Music Artist</value>
   </data>
   <data name="ItemDisplayOptions_EditorTitle_Item_Display" xml:space="preserve">
-    <value>Display Enhancements</value>
+    <value>UI Display</value>
   </data>
   <data name="LibraryOrderOptions_EditorTitle_Library_and_Order" xml:space="preserve">
-    <value>Library Ordering</value>
+    <value>Libraries &amp; Sorting</value>
   </data>
   <data name="SearchLogOptions_EditorTitle_Search_and_Logs" xml:space="preserve">
     <value>Search &amp; Logs</value>
@@ -486,19 +486,19 @@
     <value>Detect Intro Fingerprints</value>
   </data>
   <data name="ExtractIntroFingerprintTask_Description_Extracts_intro_fingerprint_from_episodes" xml:space="preserve">
-    <value>Extracts audio fingerprints and writes intro markers; credits are not processed. This task does not run when Emby provides native intro detection.</value>
+    <value>Generate audio fingerprints and update intro markers for episodes that lack them; credits are not processed. Skipped when the fingerprint API is unavailable or intro detection enhancement is disabled.</value>
   </data>
   <data name="ExtractMediaInfoTask_Name_Extract_MediaInfo" xml:space="preserve">
     <value>Extract Media Info</value>
   </data>
   <data name="ExtractMediaInfoTask_Description_Extracts_media_info_from_videos_and_audios" xml:space="preserve">
-    <value>Extract media info from videos and audio, and generate video screenshots.</value>
+    <value>Extract media info from videos and audio. When image capture is enabled, also capture images for eligible videos without a primary image.</value>
   </data>
   <data name="PersistMediaInfoTask_Name_Persist_MediaInfo" xml:space="preserve">
-    <value>Backup Media Info</value>
+    <value>Export Media Info</value>
   </data>
   <data name="PersistMediaInfoTask_Description_Persists_media_info_to_json_file" xml:space="preserve">
-    <value>Export/refresh JSON for all items that already have MediaInfo (metadata only, not media files); no probing.</value>
+    <value>Export or refresh JSON files for items that already have media info. Includes metadata only; does not probe or copy media files.</value>
   </data>
   <data name="RestoreMediaInfoTask_Name_Restore_MediaInfo" xml:space="preserve">
     <value>Restore Media Info</value>
@@ -507,16 +507,16 @@
     <value>Restore media info, chapters and thumbnails from JSON for items missing database media info; never overwrite existing media info.</value>
   </data>
   <data name="RefreshPersonTask_Name_Refresh_Chinese_Actor" xml:space="preserve">
-    <value>Refresh Actors</value>
+    <value>Refresh People</value>
   </data>
   <data name="RefreshPersonTask_Description_Refreshes_and_repairs_Chinese_actors" xml:space="preserve">
-    <value>Refreshes and repairs Chinese actors</value>
+    <value>Refresh people metadata and images, and remove duplicate Person items. Requires Chinese as the server’s preferred metadata language.</value>
   </data>
   <data name="ScanExternalSubtitleTask_Name_Scan_External_Subtitles" xml:space="preserve">
-    <value>Scan External Subtitles</value>
+    <value>Scan External Subtitles &amp; Audio</value>
   </data>
   <data name="ScanExternalSubtitleTask_Description_Scans_external_subtitles_for_videos" xml:space="preserve">
-    <value>Scans external subtitles for videos</value>
+    <value>Scan external subtitle and audio tracks for videos and update changed tracks in media info.</value>
   </data>
   <data name="Uninstall_Warning" xml:space="preserve">
     <value>Warning: Emby won't work without turning off Chinese Search Enhanced properly.</value>
@@ -579,13 +579,13 @@
     <value>Season</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_AltMovieDb" xml:space="preserve">
-    <value>TMDB Replacement</value>
+    <value>TMDB API Settings</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ChineseMetadata" xml:space="preserve">
     <value>Chinese Metadata</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_CommunityRating" xml:space="preserve">
-    <value>Community rating</value>
+    <value>Community Rating</value>
   </data>
   <data name="MetadataEnhanceOptions_CommunityRatingSource_Community_Rating_Source" xml:space="preserve">
     <value>Community rating source</value>
@@ -630,10 +630,10 @@
     <value>Unify Community Rating</value>
   </data>
   <data name="UnifyCommunityRatingTask_Description_Unify_CommunityRating_to_the_configured_source" xml:space="preserve">
-    <value>Unifies community ratings for all movies and series using the selected source. The Douban source covers the entire library and is not limited by the rating lookback. No trigger by default; enable one in Scheduled Tasks if needed.</value>
+    <value>Unify community ratings for all movies and series using the selected source. The Douban source processes the entire library and ignores the rating lookback period. No trigger is configured by default.</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_DoubanAssist" xml:space="preserve">
-    <value>Douban Enhancements</value>
+    <value>Douban</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_EpisodeGroup" xml:space="preserve">
     <value>Episode Group</value>
@@ -978,7 +978,7 @@
     <value>Global Scope</value>
   </data>
   <data name="MergeMovieTask_Description_Merge_movies_per_library_or_across_libraries_per_preference" xml:space="preserve">
-    <value>Merge movies and series per library or across libraries; run manually or after library scans.</value>
+    <value>Merge multiple versions of movies and series within the configured scope. Run manually, or automatically after a library scan when multi-version merge is enabled.</value>
   </data>
   <data name="ExperienceEnhanceOptions_SplitMovieButton_Confirmation" xml:space="preserve">
     <value>Split multi-version movies in all libraries? Scan the library first to split TV series. Continue?</value>
@@ -1056,7 +1056,7 @@
     <value>Normalize Track Language</value>
   </data>
   <data name="NormalizeTrackLanguageTask_Description_Fix_language_tags_on_external_audio_and_subtitles" xml:space="preserve">
-    <value>Fix language tags on external audio and subtitles</value>
+    <value>Correct unrecognized language tags on external audio and subtitle tracks. The task is skipped when language normalization is disabled.</value>
   </data>
   <data name="NormalizeTrackLanguageTask_Notify_Completed" xml:space="preserve">
     <value>Language tag normalization complete: {0} item(s) checked, {1} item(s) / {2} track(s) updated</value>
@@ -1134,7 +1134,7 @@
     <value>Check Media Info</value>
   </data>
   <data name="MediaHealthCheckTask_Description_Scan_media_info_for_declaration_mismatches" xml:space="preserve">
-    <value>Cross-check file-name labels against extracted media info (read-only).</value>
+    <value>Read-only comparison of file-name labels with extracted media info; writes a report without probing media files.</value>
   </data>
   <data name="ExperienceEnhanceOptions_OptimizeSubtitle_Resolve_strm_media_path_to_local_mount_for_open_subtitles_hash_and_filename_search__requires_open_subtitles_plugin__Default_is_OFF_" xml:space="preserve">
     <value>Resolve strm paths to local mounts for Open Subtitles hash and filename search (plugin required). Default is OFF.</value>
@@ -1239,10 +1239,10 @@
     <value>Query order. The first source that returns both intro and credits is used as a whole; if neither is complete, fields are merged. Empty = IntroDb,Tidb (movies always try TheIntroDB first).</value>
   </data>
   <data name="ScrapeIntroDbTask_Name_Scrape_Intro_Credits_from_IntroDb" xml:space="preserve">
-    <value>Scrape Intro &amp; Credits</value>
+    <value>Scrape Intro &amp; Credits Markers</value>
   </data>
   <data name="ScrapeIntroDbTask_Description_Fills_missing_intro_credits_markers_from_TheIntroDB" xml:space="preserve">
-    <value>Fill missing intro/credits markers for episodes in the scrape library scope, trying sources in the configured order without overwriting other sources; movies are excluded by default. Confirm coverage on the websites before running.</value>
+    <value>Fill missing intro and credits markers from the configured online sources within the selected library scope, without overwriting markers from other sources. Movies are excluded by default.</value>
   </data>
   <data name="ImageCapturePostProcess_EnsureAspect16By9_Ensure_Aspect_16x9" xml:space="preserve">
     <value>Crop to 16:9</value>
@@ -1362,10 +1362,10 @@
     <value>Merging the same series across libraries works only in Global Scope.</value>
   </data>
   <data name="ExtractVideoThumbnailTask_Description_Extract_video_thumbnail_preview" xml:space="preserve">
-    <value>Extract video thumbnails and chapter images.</value>
+    <value>Generate video thumbnails and chapter images for eligible videos without chapter images in libraries where chapter image extraction is enabled.</value>
   </data>
   <data name="EpisodeRefreshTask_Description_Refresh_metadata_for_episodes_missing_overview" xml:space="preserve">
-    <value>Refresh missing metadata and images for episodes by preference</value>
+    <value>Refresh episode metadata and images that match the configured refresh rules, lookback period, and library scope.</value>
   </data>
   <data name="CatchupTask_EpisodeRefresh_EpisodeRefresh" xml:space="preserve">
     <value>Episode Refresh</value>
@@ -1416,7 +1416,7 @@
     <value>Item Name:\n{0}\n\nItem Path:\n{1}\n\nMount Paths:\n{2}</value>
   </data>
   <data name="DeletePersonTask_Description_Deletes_all_persons" xml:space="preserve">
-    <value>Deletes all persons</value>
+    <value>Delete all Person items from the library. Available only in debug mode.</value>
   </data>
   <data name="PersistMediaInfoOption_None_None" xml:space="preserve">
     <value>OFF</value>
@@ -1542,7 +1542,7 @@
     <value>Disable NFO Saver Optimization</value>
   </data>
   <data name="DeletePersonTask_Name_Delete_Persons" xml:space="preserve">
-    <value>Delete Persons</value>
+    <value>Delete All People</value>
   </data>
   <data name="ExtractVideoThumbnailTask_Name_Extract_Video_Thumbnail" xml:space="preserve">
     <value>Extract Video Thumbnails</value>
@@ -1554,7 +1554,7 @@
     <value>Sync Douban Data</value>
   </data>
   <data name="BuildDoubanCacheTask_Description_Pre_fetches_Douban_subject_data_for_movies_and_series_into_the_local_cache__Cached_items_are_skipped" xml:space="preserve">
-    <value>Syncs Douban data for movies, series and seasons: matches Douban IDs, caches subjects, and applies ratings, overview, cast, poster and critic rating as configured. Writes the community rating when the source is Douban.</value>
+    <value>Sync Douban IDs, subject data, and ratings for movies, series, and seasons. Apply configured metadata updates; update the community rating when Douban is its source.</value>
   </data>
   <data name="RefreshEpisodeTask_Name_Refresh_Episode" xml:space="preserve">
     <value>Refresh Episode Metadata</value>
@@ -1635,7 +1635,7 @@
     <value>Extract the next episode's media info in the background during playback. Default is OFF.</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>Extraction Optimization</value>
+    <value>Extraction Control &amp; Performance</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>Fingerprint Detection</value>
@@ -1644,7 +1644,7 @@
     <value>Online Scraping</value>
   </data>
   <data name="IntroSkipOptions_Group_Playback" xml:space="preserve">
-    <value>Playback Detection</value>
+    <value>Playback &amp; Skip</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_VersionMerge" xml:space="preserve">
     <value>Merge</value>
@@ -1653,7 +1653,7 @@
     <value>Display</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_Playback" xml:space="preserve">
-    <value>Playback &amp; Cleanup</value>
+    <value>Playback, Cleanup &amp; Safety</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_Safety" xml:space="preserve">
     <value>Safety</value>
@@ -1674,7 +1674,7 @@
     <value>Memory</value>
   </data>
   <data name="GeneralOptions_Group_ConfigTransfer" xml:space="preserve">
-    <value>Backup &amp; Restore</value>
+    <value>Configuration Backup &amp; Restore</value>
   </data>
   <data name="GeneralOptions_Group_RuntimeStatus" xml:space="preserve">
     <value>Maintenance</value>
@@ -1692,7 +1692,7 @@
     <value>Disables all plugin behavior. Requires a server restart to take effect. Default is ON.</value>
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
-    <value>Network Proxy</value>
+    <value>Network &amp; Connections</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>Clear Season Map</value>
@@ -1758,13 +1758,13 @@
     <value>Rebuild Progress Index</value>
   </data>
   <data name="RebuildUserDataKeysTask_Description_Recompute_and_persist_the_per_library_user_data_key_for_every_movie_and_episode__Run_once_after_toggling_Track_Play_Progress_per_Library_and_restarting" xml:space="preserve">
-    <value>Recompute and write the per-library progress index for every movie, series, season and episode. Run once after toggling Track Play Progress per Library and restarting Emby; run again with the option off to restore the original state.</value>
+    <value>Recompute the per-library playback progress index for movies, series, seasons, and episodes. Run once after changing “Track Play Progress per Library” and restarting Emby; run again with the option off to restore the original index.</value>
   </data>
   <data name="CleanupMetadataCacheTask_Name_Cleanup_Metadata_Cache" xml:space="preserve">
-    <value>Clean Metadata Cache</value>
+    <value>Clean Expired Metadata Cache</value>
   </data>
   <data name="CleanupMetadataCacheTask_Description_Delete_expired_passive_cache_files__override_and_patches_are_kept" xml:space="preserve">
-    <value>Delete expired passive cache files; override and patches are kept. Does nothing when Cache TTL is 0.</value>
+    <value>Delete expired local metadata cache files; keep override files and patches. Does nothing when caching is disabled or Cache TTL is 0.</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnableServerSideVersionLabel_Server_Side_Version_Label" xml:space="preserve">
     <value>Server-side Version Label</value>
@@ -1773,7 +1773,7 @@
     <value>Show quality, HDR and audio tags in the version selector on clients that support it (e.g. Kodi); multiple versions only. Default is OFF.</value>
   </data>
   <data name="ScheduledTasks_EditorTitle_Scheduled_Tasks" xml:space="preserve">
-    <value>Common Tasks</value>
+    <value>Task Shortcuts</value>
   </data>
   <data name="ScheduledTasks_Started" xml:space="preserve">
     <value>Started: {0}</value>
@@ -1911,12 +1911,9 @@
     <value>Posters &amp; People</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ScrapeEpisodeGroup" xml:space="preserve">
-    <value>Episode Scraping</value>
+    <value>Episode Scraping &amp; Grouping</value>
   </data>
-  <data name="MetadataEnhanceOptions_Group_RefreshCache" xml:space="preserve">
-    <value>Refresh &amp; Cache</value>
-  </data>
-  <data name="NetworkProxyOptions_Group_NetworkDirectLink" xml:space="preserve">
+<data name="NetworkProxyOptions_Group_NetworkDirectLink" xml:space="preserve">
     <value>Network &amp; Direct Link</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_NotificationAndLogs" xml:space="preserve">
@@ -1959,7 +1956,7 @@
     <value>Check Plugin Updates</value>
   </data>
   <data name="PluginUpdateTask_Description_Checks_GitHub_Releases_and_optionally_updates" xml:space="preserve">
-    <value>Checks the official GitHub Releases and optionally downloads the latest version. Restart Emby after an update.</value>
+    <value>Check official GitHub Releases weekly. When automatic download is enabled, install same-major updates; restart Emby afterward.</value>
   </data>
   <data name="PluginUpdate_Status_NeverChecked" xml:space="preserve">
     <value>Not checked yet</value>
@@ -2031,7 +2028,7 @@
     <value>Plugin update failed</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_EpisodeRefresh" xml:space="preserve">
-    <value>Episode Refresh</value>
+    <value>Episode Metadata Refresh</value>
   </data>
   <data name="ModOptions_TvdbFallbackLanguages_TVDB_Fallback_Languages_Description" xml:space="preserve">
     <value>TVDB fallback metadata languages, priority left to right. Default is zhtw,yue.</value>
@@ -2050,5 +2047,23 @@
   </data>
   <data name="MetadataEnhanceOptions_AltMovieDbConfig_Description" xml:space="preserve">
     <value>Optional. Replaces the MovieDb TMDB API URL, image URL, and key; this is not a network proxy. When off, MovieDb defaults are used. Does not affect IMDb, MdbList, or Douban.</value>
+  </data>
+  <data name="ScheduledTask_Category_MediaInfo" xml:space="preserve">
+    <value>Media Info</value>
+  </data>
+  <data name="ScheduledTask_Category_Metadata" xml:space="preserve">
+    <value>Metadata</value>
+  </data>
+  <data name="ScheduledTask_Category_IntroCredits" xml:space="preserve">
+    <value>Intro &amp; Credits</value>
+  </data>
+  <data name="ScheduledTask_Category_MultiVersion" xml:space="preserve">
+    <value>Multiple Versions</value>
+  </data>
+  <data name="ScheduledTask_Category_Maintenance" xml:space="preserve">
+    <value>Maintenance</value>
+  </data>
+  <data name="ScheduledTask_Category_PluginUpdate" xml:space="preserve">
+    <value>Plugin Update</value>
   </data>
 </root>

@@ -291,10 +291,10 @@
     <value>藝術家</value>
   </data>
   <data name="ItemDisplayOptions_EditorTitle_Item_Display" xml:space="preserve">
-    <value>顯示最佳化</value>
+    <value>介面顯示</value>
   </data>
   <data name="LibraryOrderOptions_EditorTitle_Library_and_Order" xml:space="preserve">
-    <value>媒體庫排序</value>
+    <value>媒體庫與排序</value>
   </data>
   <data name="SearchLogOptions_EditorTitle_Search_and_Logs" xml:space="preserve">
     <value>搜尋與日誌</value>
@@ -399,19 +399,19 @@
     <value>偵測片頭指紋</value>
   </data>
   <data name="ExtractIntroFingerprintTask_Description_Extracts_intro_fingerprint_from_episodes" xml:space="preserve">
-    <value>擷取音訊指紋並寫入片頭標記，不處理片尾；目前 Emby 已提供原生片頭偵測時，此工作不執行。</value>
+    <value>為缺少片頭標記的單集產生音訊指紋並更新片頭標記，不處理片尾。指紋介面不可用或未啟用片頭偵測增強時不執行。</value>
   </data>
   <data name="ExtractMediaInfoTask_Name_Extract_MediaInfo" xml:space="preserve">
     <value>擷取媒體資訊</value>
   </data>
   <data name="ExtractMediaInfoTask_Description_Extracts_media_info_from_videos_and_audios" xml:space="preserve">
-    <value>擷取影片/音訊的媒體資訊，並產生影片截圖。</value>
+    <value>擷取影片和音訊的媒體資訊；啟用截圖後，為符合條件且缺少主圖的影片產生截圖。</value>
   </data>
   <data name="PersistMediaInfoTask_Name_Persist_MediaInfo" xml:space="preserve">
-    <value>備份媒體資訊</value>
+    <value>匯出媒體資訊</value>
   </data>
   <data name="PersistMediaInfoTask_Description_Persists_media_info_to_json_file" xml:space="preserve">
-    <value>全庫匯出/刷新已有媒體訊息的 JSON（不含媒體檔案），不探測媒體。</value>
+    <value>為已有媒體資訊的項目匯出或重新整理 JSON 檔案。僅包含元資料，不探測或複製媒體檔案。</value>
   </data>
   <data name="RestoreMediaInfoTask_Name_Restore_MediaInfo" xml:space="preserve">
     <value>恢復媒體資訊</value>
@@ -420,16 +420,16 @@
     <value>從 JSON 恢復資料庫中缺失的媒體資訊、章節和縮圖；不覆蓋已有媒體資訊。</value>
   </data>
   <data name="RefreshPersonTask_Name_Refresh_Chinese_Actor" xml:space="preserve">
-    <value>刷新演員資訊</value>
+    <value>重新整理人物資訊</value>
   </data>
   <data name="RefreshPersonTask_Description_Refreshes_and_repairs_Chinese_actors" xml:space="preserve">
-    <value>刷新和修復演員訊息，盡可能獲取中文及頭像</value>
+    <value>重新整理人物資訊與頭像，並清理重複人物項目。伺服器偏好元資料語言必須為中文。</value>
   </data>
   <data name="ScanExternalSubtitleTask_Name_Scan_External_Subtitles" xml:space="preserve">
-    <value>掃描外掛字幕</value>
+    <value>掃描外掛字幕與音軌</value>
   </data>
   <data name="ScanExternalSubtitleTask_Description_Scans_external_subtitles_for_videos" xml:space="preserve">
-    <value>單獨掃描影片的外掛字幕更新至媒體訊息</value>
+    <value>掃描影片的外掛字幕與外掛音軌，並將變更更新至媒體資訊。</value>
   </data>
   <data name="Uninstall_Warning" xml:space="preserve">
     <value>警告：中文搜索增强未正常关闭，Emby 将无法工作。</value>
@@ -492,7 +492,7 @@
     <value>季</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_AltMovieDb" xml:space="preserve">
-    <value>TMDB 替換</value>
+    <value>TMDB 介面設定</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ChineseMetadata" xml:space="preserve">
     <value>中文元資料</value>
@@ -543,10 +543,10 @@
     <value>統一社群評分</value>
   </data>
   <data name="UnifyCommunityRatingTask_Description_Unify_CommunityRating_to_the_configured_source" xml:space="preserve">
-    <value>依所選來源統一全庫電影與劇集的社群評分；豆瓣來源會處理全庫，不受評分回看期限制。預設無觸發器，可在計畫任務中依需啟用。</value>
+    <value>依所選來源統一全庫電影與劇集的社群評分；豆瓣來源處理全庫，不受評分回溯期限制。預設不設定觸發器。</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_DoubanAssist" xml:space="preserve">
-    <value>豆瓣增強</value>
+    <value>豆瓣</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_EpisodeGroup" xml:space="preserve">
     <value>劇集組</value>
@@ -891,7 +891,7 @@
     <value>跨媒體庫合併</value>
   </data>
   <data name="MergeMovieTask_Description_Merge_movies_per_library_or_across_libraries_per_preference" xml:space="preserve">
-    <value>依偏好庫內或跨庫合併電影與劇集；可手動或掃庫後執行。</value>
+    <value>在設定的範圍內合併電影與劇集的多個版本。可手動執行，也可在啟用多版本合併後由媒體庫掃描工作自動執行。</value>
   </data>
   <data name="ExperienceEnhanceOptions_SplitMovieButton_Confirmation" xml:space="preserve">
     <value>將拆分所有庫中的多版本電影；電視節目請先掃庫。繼續？</value>
@@ -969,7 +969,7 @@
     <value>規範音軌字幕語言</value>
   </data>
   <data name="NormalizeTrackLanguageTask_Description_Fix_language_tags_on_external_audio_and_subtitles" xml:space="preserve">
-    <value>修正外掛音軌與字幕的語言標記</value>
+    <value>修正外掛音軌和字幕中未識別的語言標籤。未啟用語言正規化時不執行。</value>
   </data>
   <data name="NormalizeTrackLanguageTask_Notify_Completed" xml:space="preserve">
     <value>語言標記規範完成：檢查 {0} 個項目，修正 {1} 個項目 / {2} 條軌道</value>
@@ -1044,10 +1044,10 @@
     <value>有 {0} 條外掛字幕語言未辨識</value>
   </data>
   <data name="MediaHealthCheckTask_Name_Media_Health_Check" xml:space="preserve">
-    <value>檢查片源</value>
+    <value>檢查媒體資訊</value>
   </data>
   <data name="MediaHealthCheckTask_Description_Scan_media_info_for_declaration_mismatches" xml:space="preserve">
-    <value>交叉比對檔名標註與已擷取的媒體資訊（唯讀）。</value>
+    <value>唯讀比對檔名標註與已擷取的媒體資訊並產生報告，不探測媒體檔案。</value>
   </data>
   <data name="ExperienceEnhanceOptions_OptimizeSubtitle_Resolve_strm_media_path_to_local_mount_for_open_subtitles_hash_and_filename_search__requires_open_subtitles_plugin__Default_is_OFF_" xml:space="preserve">
     <value>將 strm 路徑解析為本機掛載，供 Open Subtitles 計算雜湊與按檔名搜索（需該外掛）。預設關閉。</value>
@@ -1152,10 +1152,10 @@
     <value>查詢順序。第一個同時提供片頭與片尾的來源會整條採用；都沒有完整資料時才按欄位互補。留空 = IntroDb,Tidb（電影始終先查 TheIntroDB）。</value>
   </data>
   <data name="ScrapeIntroDbTask_Name_Scrape_Intro_Credits_from_IntroDb" xml:space="preserve">
-    <value>刮削片頭片尾</value>
+    <value>刮削片頭片尾標記</value>
   </data>
   <data name="ScrapeIntroDbTask_Description_Fills_missing_intro_credits_markers_from_TheIntroDB" xml:space="preserve">
-    <value>依“刮削媒體庫”範圍為劇集補齊缺失的片頭片尾標記，依資料源順序嘗試，不覆蓋其他來源；預設不包含電影。建議先在網站確認有資料再執行。</value>
+    <value>在所選媒體庫範圍內從線上資料來源補齊片頭片尾標記，不覆寫其他來源的標記；預設不包含電影。</value>
   </data>
   <data name="ImageCapturePostProcess_EnsureAspect16By9_Ensure_Aspect_16x9" xml:space="preserve">
     <value>裁剪為 16:9</value>
@@ -1275,10 +1275,10 @@
     <value>跨庫的同一劇集版本合併僅在“全域範圍”下生效。</value>
   </data>
   <data name="ExtractVideoThumbnailTask_Description_Extract_video_thumbnail_preview" xml:space="preserve">
-    <value>擷取影片縮圖與章節圖。</value>
+    <value>在已啟用章節影像擷取的媒體庫中，為符合條件且缺少章節圖的影片產生縮圖與章節圖。</value>
   </data>
   <data name="EpisodeRefreshTask_Description_Refresh_metadata_for_episodes_missing_overview" xml:space="preserve">
-    <value>按偏好刷新劇集缺失的元資料和圖片</value>
+    <value>依設定的重新整理規則、回溯天數與媒體庫範圍，更新需要重新整理的單集元資料與圖片。</value>
   </data>
   <data name="CatchupTask_EpisodeRefresh_EpisodeRefresh" xml:space="preserve">
     <value>劇集元資料刷新</value>
@@ -1329,7 +1329,7 @@
     <value>名稱:\n{0}\n\n路徑:\n{1}\n\n裝載路徑:\n{2}</value>
   </data>
   <data name="DeletePersonTask_Description_Deletes_all_persons" xml:space="preserve">
-    <value>清除所有人員數據</value>
+    <value>刪除媒體庫中的所有人物項目。僅在偵錯模式下可用。</value>
   </data>
   <data name="PersistMediaInfoOption_None_None" xml:space="preserve">
     <value>關閉</value>
@@ -1455,7 +1455,7 @@
     <value>停用 NFO 儲存最佳化</value>
   </data>
   <data name="DeletePersonTask_Name_Delete_Persons" xml:space="preserve">
-    <value>刪除人員資料</value>
+    <value>刪除所有人物項目</value>
   </data>
   <data name="ExtractVideoThumbnailTask_Name_Extract_Video_Thumbnail" xml:space="preserve">
     <value>擷取影片縮圖</value>
@@ -1467,10 +1467,10 @@
     <value>同步豆瓣資料</value>
   </data>
   <data name="BuildDoubanCacheTask_Description_Pre_fetches_Douban_subject_data_for_movies_and_series_into_the_local_cache__Cached_items_are_skipped" xml:space="preserve">
-    <value>同步電影、劇集與季的豆瓣資料：比對豆瓣 ID、快取條目，並依勾選套用評分、簡介、演員、海報與影評人評分。來源為豆瓣時同步寫入主評分。</value>
+    <value>同步電影、劇集與季的豆瓣 ID、條目資料與評分；依設定更新元資料。社群評分來源為豆瓣時同步更新。</value>
   </data>
   <data name="RefreshEpisodeTask_Name_Refresh_Episode" xml:space="preserve">
-    <value>刷新劇集中繼資料</value>
+    <value>重新整理單集元資料</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionScope" xml:space="preserve">
     <value>擷取範圍</value>
@@ -1548,7 +1548,7 @@
     <value>播放時背景擷取下一集媒體資訊。預設關閉。</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>擷取最佳化</value>
+    <value>擷取控制與效能</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>片頭指紋偵測</value>
@@ -1557,7 +1557,7 @@
     <value>線上刮削</value>
   </data>
   <data name="IntroSkipOptions_Group_Playback" xml:space="preserve">
-    <value>播放偵測</value>
+    <value>播放與跳過</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_VersionMerge" xml:space="preserve">
     <value>合併</value>
@@ -1566,7 +1566,7 @@
     <value>顯示</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_Playback" xml:space="preserve">
-    <value>播放與清理</value>
+    <value>播放、清理與安全</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_Safety" xml:space="preserve">
     <value>安全</value>
@@ -1587,7 +1587,7 @@
     <value>記憶體管理</value>
   </data>
   <data name="GeneralOptions_Group_ConfigTransfer" xml:space="preserve">
-    <value>備份與恢復</value>
+    <value>設定備份與還原</value>
   </data>
   <data name="GeneralOptions_Group_RuntimeStatus" xml:space="preserve">
     <value>維護工具</value>
@@ -1605,7 +1605,7 @@
     <value>關閉後外掛不執行任何行為。修改後需重啟伺服器生效，預設開啟。</value>
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
-    <value>網路代理</value>
+    <value>網路與連線</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>清除季映射</value>
@@ -1614,7 +1614,7 @@
     <value>多版本</value>
   </data>
   <data name="DisclaimerDialog_EditorTitle_Disclaimer" xml:space="preserve">
-    <value>聲明</value>
+    <value>免責聲明</value>
   </data>
   <data name="DisclaimerDialog_Statement_Disclaimer" xml:space="preserve">
     <value>本專案為 GPL-3.0 開源專案，與 Emby LLC 沒有任何關聯，也未獲得 Emby LLC 的授權或認可。本專案的目的為合法購買並安裝了 Emby 軟體的使用者提供額外的功能增強與使用便利。</value>
@@ -1671,13 +1671,13 @@
     <value>重建播放進度索引</value>
   </data>
   <data name="RebuildUserDataKeysTask_Description_Recompute_and_persist_the_per_library_user_data_key_for_every_movie_and_episode__Run_once_after_toggling_Track_Play_Progress_per_Library_and_restarting" xml:space="preserve">
-    <value>按目前開關重算並寫入每個電影、劇集、季與單集的按庫播放進度索引。切換“各媒體庫內記錄播放進度”並重新啟動 Emby 後執行一次；關閉開關後執行可還原原狀態。</value>
+    <value>重新計算電影、劇集、季與單集的按媒體庫播放進度索引。變更「各媒體庫內記錄播放進度」並重新啟動 Emby 後執行一次；關閉該功能後再次執行可還原原索引。</value>
   </data>
   <data name="CleanupMetadataCacheTask_Name_Cleanup_Metadata_Cache" xml:space="preserve">
-    <value>清理中繼資料快取</value>
+    <value>清理過期元資料快取</value>
   </data>
   <data name="CleanupMetadataCacheTask_Description_Delete_expired_passive_cache_files__override_and_patches_are_kept" xml:space="preserve">
-    <value>刪除超過有效期的被動快取檔案，保留 override 與 patches。快取有效期設為 0 時不執行。</value>
+    <value>刪除已過期的本機元資料快取檔案，保留覆寫檔案與補丁。快取未啟用或有效期為 0 時不執行。</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnableServerSideVersionLabel_Server_Side_Version_Label" xml:space="preserve">
     <value>伺服器端版本標籤</value>
@@ -1686,7 +1686,7 @@
     <value>讓支援版本選擇的客戶端（如 Kodi）在版本下拉顯示畫質、HDR 與音軌標籤；僅多版本條目生效。預設關閉。</value>
   </data>
   <data name="ScheduledTasks_EditorTitle_Scheduled_Tasks" xml:space="preserve">
-    <value>常用任務</value>
+    <value>任務捷徑</value>
   </data>
   <data name="ScheduledTasks_Started" xml:space="preserve">
     <value>已開始執行：{0}</value>
@@ -1824,12 +1824,9 @@
     <value>海報與人物</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ScrapeEpisodeGroup" xml:space="preserve">
-    <value>劇集刮削</value>
+    <value>劇集刮削與分組</value>
   </data>
-  <data name="MetadataEnhanceOptions_Group_RefreshCache" xml:space="preserve">
-    <value>重新整理與快取</value>
-  </data>
-  <data name="NetworkProxyOptions_Group_NetworkDirectLink" xml:space="preserve">
+<data name="NetworkProxyOptions_Group_NetworkDirectLink" xml:space="preserve">
     <value>網路與直鏈</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_NotificationAndLogs" xml:space="preserve">
@@ -1872,7 +1869,7 @@
     <value>檢查外掛更新</value>
   </data>
   <data name="PluginUpdateTask_Description_Checks_GitHub_Releases_and_optionally_updates" xml:space="preserve">
-    <value>檢查官方 GitHub Release，發現新版本時可自動下載。更新後需重新啟動 Emby。</value>
+    <value>每週檢查官方 GitHub Release；啟用自動下載後安裝同一主版本的更新，更新後需重新啟動 Emby。</value>
   </data>
   <data name="PluginUpdate_Status_NeverChecked" xml:space="preserve">
     <value>尚未檢查</value>
@@ -1944,7 +1941,7 @@
     <value>外掛更新失敗</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_EpisodeRefresh" xml:space="preserve">
-    <value>劇集刷新</value>
+    <value>單集元資料重新整理</value>
   </data>
   <data name="ModOptions_TvdbFallbackLanguages_TVDB_Fallback_Languages_Description" xml:space="preserve">
     <value>TVDB 備選中繼資料語言，優先順序由左至右。預設 zhtw,yue。</value>
@@ -1963,5 +1960,23 @@
   </data>
   <data name="MetadataEnhanceOptions_AltMovieDbConfig_Description" xml:space="preserve">
     <value>可選。僅取代 MovieDb 的 TMDB API 位址、圖片位址與 Key，不是網路代理；關閉時使用 MovieDb 預設設定。不影響 IMDb、MdbList 與豆瓣。</value>
+  </data>
+  <data name="ScheduledTask_Category_MediaInfo" xml:space="preserve">
+    <value>媒體資訊</value>
+  </data>
+  <data name="ScheduledTask_Category_Metadata" xml:space="preserve">
+    <value>元資料</value>
+  </data>
+  <data name="ScheduledTask_Category_IntroCredits" xml:space="preserve">
+    <value>片頭片尾</value>
+  </data>
+  <data name="ScheduledTask_Category_MultiVersion" xml:space="preserve">
+    <value>多版本</value>
+  </data>
+  <data name="ScheduledTask_Category_Maintenance" xml:space="preserve">
+    <value>維護工具</value>
+  </data>
+  <data name="ScheduledTask_Category_PluginUpdate" xml:space="preserve">
+    <value>外掛更新</value>
   </data>
 </root>

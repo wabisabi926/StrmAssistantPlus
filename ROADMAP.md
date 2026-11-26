@@ -8,7 +8,7 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 627/627 通过；最终 DLL 同时部署到两套测试环境，SHA-256 一致。
+- 单测 655/655 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行。
 - 关闭功能 smoke：MergeMultiVersion、ServerSideVersionLabel、CustomLocalDiscovery（4.10/4.11）、深度删除自定义通知通过。

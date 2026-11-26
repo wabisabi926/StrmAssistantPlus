@@ -4845,15 +4845,6 @@ namespace StrmAssistant.Properties {
         /// <summary>
         ///   Looks up a localized string.
         /// </summary>
-        public static string MetadataEnhanceOptions_Group_RefreshCache {
-            get {
-                return ResourceManager.GetString("MetadataEnhanceOptions_Group_RefreshCache", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string.
-        /// </summary>
         public static string MetadataEnhanceOptions_Group_ScrapeEpisodeGroup {
             get {
                 return ResourceManager.GetString("MetadataEnhanceOptions_Group_ScrapeEpisodeGroup", resourceCulture);
@@ -5973,6 +5964,60 @@ namespace StrmAssistant.Properties {
         public static string MediaInfoMenu_PluginDisabled {
             get {
                 return ResourceManager.GetString("MediaInfoMenu_PluginDisabled", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_IntroCredits {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_IntroCredits", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_Maintenance {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_Maintenance", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_MediaInfo {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_MediaInfo", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_Metadata {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_Metadata", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_MultiVersion {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_MultiVersion", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ScheduledTask_Category_PluginUpdate {
+            get {
+                return ResourceManager.GetString("ScheduledTask_Category_PluginUpdate", resourceCulture);
             }
         }
 
