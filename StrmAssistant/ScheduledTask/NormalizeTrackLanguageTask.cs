@@ -32,7 +32,7 @@ namespace StrmAssistant.ScheduledTask
             Plugin.Instance.DefaultUICulture);
 
         public string Category => Resources.ResourceManager.GetString(
-            "PluginOptions_EditorTitle_Strm_Assistant", Plugin.Instance.DefaultUICulture);
+            "ScheduledTask_Category_MediaInfo", Plugin.Instance.DefaultUICulture);
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers() => Array.Empty<TaskTriggerInfo>();
 

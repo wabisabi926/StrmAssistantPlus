@@ -144,7 +144,7 @@ namespace StrmAssistant.ScheduledTask
                    !string.IsNullOrEmpty(item.GetProviderId(MetadataProviders.Imdb));
         }
 
-        public string Category => Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+        public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_IntroCredits",
             Plugin.Instance.DefaultUICulture);
 
         public string Key => "ScrapeIntroDbTask";

@@ -45,7 +45,7 @@ namespace StrmAssistant.ScheduledTask
             "PluginUpdateTask_Description_Checks_GitHub_Releases_and_optionally_updates",
             Plugin.Instance.DefaultUICulture);
 
-        public string Category => Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+        public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_PluginUpdate",
             Plugin.Instance.DefaultUICulture);
 
         public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()

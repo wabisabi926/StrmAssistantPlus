@@ -169,7 +169,7 @@ namespace StrmAssistant.ScheduledTask
             _logger.Info("MediaInfoRestore - Scheduled Task Complete");
         }
 
-        public string Category => Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+        public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_MediaInfo",
             Plugin.Instance.DefaultUICulture);
 
         public string Key => "MediaInfoRestoreTask";

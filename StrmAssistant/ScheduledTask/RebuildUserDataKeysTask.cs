@@ -80,7 +80,7 @@ namespace StrmAssistant.ScheduledTask
         }
 
         public string Category =>
-            Resources.ResourceManager.GetString("PluginOptions_EditorTitle_Strm_Assistant",
+            Resources.ResourceManager.GetString("ScheduledTask_Category_Maintenance",
                 Plugin.Instance.DefaultUICulture);
 
         public string Key => "RebuildUserDataKeysTask";
