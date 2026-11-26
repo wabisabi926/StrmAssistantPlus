@@ -19,6 +19,14 @@ define([
     confirm = confirm && (confirm.default || confirm);
     dialog = dialog && (dialog.default || dialog);
 
+    function toastOperationFailed() {
+        const locale = globalize.getCurrentLocale().toLowerCase();
+        const message = locale === 'zh-cn' ? '操作失败，请查看服务器日志后重试。' :
+            (['zh-hk', 'zh-tw'].includes(locale) ? '操作失敗，請查看伺服器記錄後重試。' :
+                'Operation failed. Check the server log and try again.');
+        toast(message);
+    }
+
     // 共享扫描调度：三个子模块（badges / versions / ui）原先各自持有
     // MutationObserver + 防抖计时器，一次 DOM 变更会触发三次全量扫描。
     // 现在改为单一 observer + 单一防抖，各子模块通过 registerScan 注册扫描函数。
@@ -233,7 +241,7 @@ define([
                 url: copyApi,
                 data: JSON.stringify({ Id: libraryId }),
                 contentType: "application/json"
-            }).finally(() => {
+            }).then(() => {
                 loading.hide();
                 const locale = globalize.getCurrentLocale().toLowerCase();
                 const confirmMessage = (locale === 'zh-cn') ? '\u590d\u5236\u5a92\u4f53\u5e93\u6210\u529f' : 
@@ -243,6 +251,9 @@ define([
                 if (itemsContainer) {
                     itemsContainer.notifyRefreshNeeded(true);
                 }
+            }).catch(() => {
+                loading.hide();
+                toastOperationFailed();
             });
         },
 
@@ -264,7 +275,7 @@ define([
                     url: deleteApi + "?refreshLibrary=false&id=" + libraryId,
                     data: {},
                     contentType: "application/json"
-                }).finally(() => {
+                }).then(() => {
                     loading.hide();
                     const locale = globalize.getCurrentLocale().toLowerCase();
                     const confirmMessage = (locale === 'zh-cn') ? '\u5408\u96c6\u5220\u9664\u6210\u529f' : 
@@ -274,6 +285,9 @@ define([
                     if (itemsContainer) {
                         itemsContainer.notifyRefreshNeeded(true);
                     }
+                }).catch(() => {
+                    loading.hide();
+                    toastOperationFailed();
                 });
             });
         },
@@ -297,10 +311,13 @@ define([
                 url: `${scanApi}?${queryString}`,
                 data: {},
                 contentType: "application/json"
-            }).finally(() => {
+            }).then(() => {
                 loading.hide();
                 const confirmMessage = globalize.translate('ScanningLibraryFilesDots');
                 toast(confirmMessage);
+            }).catch(() => {
+                loading.hide();
+                toastOperationFailed();
             });
         },
 
@@ -361,12 +378,15 @@ define([
                     url: deleteApi,
                     data: {},
                     contentType: "application/json"
-                }).finally(() => {
+                }).then(() => {
                     loading.hide();
                     const locale = globalize.getCurrentLocale().toLowerCase();
-                    const confirmMessage = (locale === 'zh-cn') ? '\u5220\u9664\u7248\u672C\u6210\u529F' : 
-                        (['zh-hk', 'zh-tw'].includes(locale) ? '\u524A\u9664\u7248\u672C\u6210\u529F' : 'Delete Version Success');
+                    const confirmMessage = (locale === 'zh-cn') ? '\u5220\u9664\u7248\u672c\u6210\u529f' :
+                        (['zh-hk', 'zh-tw'].includes(locale) ? '\u524a\u9664\u7248\u672c\u6210\u529f' : 'Delete Version Success');
                     toast(confirmMessage);
+                }).catch(() => {
+                    loading.hide();
+                    toastOperationFailed();
                 });
             }
         },
@@ -760,30 +780,6 @@ define([
                 });
             }
 
-            // 与后端 MultiVersionService.QualityScore/GetHdrLabel 保持一致的档位顺序（前=最优）。
-            // 注意：顺序必须含 DV 细分档（P7/P8/P9/P5，对应后端 520/515/510/505）与 "HDR Vivid"（350 分），
-            // 且未识别的取值应归入最低档，不能因为 indexOf 返回 -1 被 Math.max(0, ...) 误判为最高档。
-            function rankOf(list, value) {
-                if (!value) return list.length;
-                const idx = list.indexOf(value);
-                return idx < 0 ? list.length : idx;
-            }
-
-            function scoreOf(info) {
-                if (!info) return -1;
-                const labels = ['8K', '4K', '1440p', '1080p', '720p', 'SD'];
-                const hdrs = ['DV P7', 'DV P8', 'DV P9', 'DV P5', 'DV', 'HDR10+', 'HDR Vivid', 'HDR'];
-                const rawLabel = info.Label || info.label;
-                // 复合标签（如 "4K HEVC 20.4Mbps 45.2GB"）取首个空格分词作为画质档位参与排序，
-                // 否则整串匹配不到 labels 会被误判为最低档（MediaInfoExtended 模式）。
-                const label = rawLabel ? String(rawLabel).split(' ')[0] : rawLabel;
-                const hdr = info.Hdr || info.hdr;
-                const lr = rankOf(labels, label);
-                const hr = rankOf(hdrs, hdr);
-                const bitrate = (info.Bitrate || info.bitrate || 0) / 1000000;
-                return (labels.length - lr) * 10000 + (hdrs.length + 1 - hr) * 100 + Math.min(bitrate, 99);
-            }
-
             function makeChip(info) {
                 const chip = document.createElement('span');
                 chip.className = 'mediaInfoItem mv-quality-badge';
@@ -805,11 +801,19 @@ define([
                 if (!sources.length) return;
 
                 const rows = Array.prototype.slice.call(container.querySelectorAll('.mediaSource'));
+                const usedSources = [];
                 const entries = rows.map(function (row, i) {
+                    const title = row.querySelector('.sectionTitle');
+                    const path = title ? title.textContent.trim() : '';
+                    let sourceIndex = sources.findIndex(function (source, j) {
+                        const sourcePath = source.Path || source.path;
+                        return sourcePath && sourcePath === path && usedSources.indexOf(j) < 0;
+                    });
+                    if (sourceIndex < 0 && usedSources.indexOf(i) < 0) sourceIndex = i;
+                    if (sourceIndex >= 0) usedSources.push(sourceIndex);
                     return {
                         row: row,
-                        wrapper: row.parentElement === container ? row : row.parentElement,
-                        info: sources[i]
+                        info: sources[sourceIndex]
                     };
                 });
 
@@ -820,10 +824,6 @@ define([
                     if (!items || !label) return;
                     items.appendChild(makeChip(e.info));
                 });
-
-                const sorted = entries.slice().sort(function (a, b) { return scoreOf(b.info) - scoreOf(a.info); });
-                const changed = entries.some(function (e, i) { return sorted[i].row !== e.row; });
-                if (changed) sorted.forEach(function (e) { container.appendChild(e.wrapper); });
             }
 
             function decorateCards(page) {
@@ -1155,6 +1155,11 @@ define([
                 dataType: "json"
             }).then(function(res) {
                 loading.hide();
+                const serverMessage = res && (res.Message !== undefined ? res.Message : res.message);
+                if (serverMessage && serverMessage !== 'queued') {
+                    toast(serverMessage);
+                    return;
+                }
                 const total = res && (res.Total !== undefined ? res.Total : res.total);
                 const queued = res && (res.Queued !== undefined ? res.Queued : res.queued);
                 const succeeded = res && (res.Succeeded !== undefined ? res.Succeeded : res.succeeded);
@@ -1173,6 +1178,7 @@ define([
                 toast(message);
             }).catch(function() {
                 loading.hide();
+                toastOperationFailed();
             });
         };
 
@@ -1220,6 +1226,7 @@ define([
         })
         .catch(function() {
             loading.hide();
+            toastOperationFailed();
         });
     }
 });

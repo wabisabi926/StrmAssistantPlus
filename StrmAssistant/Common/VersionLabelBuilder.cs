@@ -20,7 +20,6 @@ namespace StrmAssistant.Common
 
         /// <summary>
         /// 画质评分：分辨率为主，HDR/DV 加成（用于排序比较）。
-        /// 档位顺序须与 <c>strmassistant.js</c> 的 <c>hdrs</c> 列表保持一致（前 = 最优）。
         /// DV 细分档：原盘双层 P7 &gt; 单层 P8 &gt; P9 &gt; 流媒体 P5 &gt; 未识别 DV。
         /// </summary>
         public static int QualityScore(int? height, string hdr)
@@ -56,7 +55,6 @@ namespace StrmAssistant.Common
         /// <summary>
         /// 「画质+体积」标签：画质档位 + 视频编码 + 码率 + 文件体积，
         /// 形如 <c>4K HEVC 20.4Mbps 45.2GB</c>。任一缺项自动省略，全缺则返回 null。
-        /// 注意：档位词必须留在**首位**，前端 <c>strmassistant.js</c> 的排序按首个空格分词取档位。
         /// </summary>
         public static string BuildMediaInfoLabel(MediaStream video, long? bitrate, long? size)
         {
@@ -134,7 +132,6 @@ namespace StrmAssistant.Common
         /// 双层 DV Profile 7 原盘的**增强层**会被 <c>DolbyVisionProfile</c> 标注为
         /// <c>ExtendedVideoSubType = DoviProfile76</c>，而基础层仍是 HDR10，
         /// 因此这里需要扫描**全部视频流**取最优档位，只看主视频流会漏掉 DV 信息。
-        /// 档位顺序须与 <c>strmassistant.js</c> 的 <c>hdrs</c> 列表保持一致（前 = 最优）。
         /// </summary>
         public static string GetHdrLabel(IEnumerable<MediaStream> streams)
         {

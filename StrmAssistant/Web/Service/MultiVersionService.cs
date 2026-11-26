@@ -18,6 +18,7 @@ namespace StrmAssistant.Web.Service
     {
         public class MultiVersionSource
         {
+            public string Path { get; set; }
             public string Container { get; set; }
             public long? Size { get; set; }
             public int? Width { get; set; }
@@ -139,6 +140,7 @@ namespace StrmAssistant.Web.Service
                         Path = path,
                         Source = new MultiVersionSource
                         {
+                        Path = path,
                         Container = source.Container,
                         Size = source.Size,
                         Width = video?.Width,

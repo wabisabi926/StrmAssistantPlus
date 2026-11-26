@@ -8,6 +8,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.IO;
 using StrmAssistant.Common;
 using StrmAssistant.Options;
+using StrmAssistant.Properties;
 using StrmAssistant.Web.Api;
 using System;
 using System.Collections.Generic;
@@ -80,7 +81,7 @@ namespace StrmAssistant.Web.Service
             var response = new MediaInfoMenuResponse();
             if (!Plugin.IsPluginEnabled)
             {
-                response.Message = "plugin disabled";
+                response.Message = Resources.MediaInfoMenu_PluginDisabled;
                 return response;
             }
 
@@ -88,7 +89,7 @@ namespace StrmAssistant.Web.Service
             response.Total = items.Count;
             if (items.Count == 0)
             {
-                response.Message = "no supported items";
+                response.Message = Resources.MediaInfoMenu_NoSupportedItems;
                 return response;
             }
 
@@ -138,7 +139,7 @@ namespace StrmAssistant.Web.Service
             var response = new MediaInfoMenuResponse();
             if (!Plugin.IsPluginEnabled)
             {
-                response.Message = "plugin disabled";
+                response.Message = Resources.MediaInfoMenu_PluginDisabled;
                 return response;
             }
 
@@ -146,13 +147,13 @@ namespace StrmAssistant.Web.Service
             response.Total = items.Count;
             if (items.Count == 0)
             {
-                response.Message = "no supported items";
+                response.Message = Resources.MediaInfoMenu_NoSupportedItems;
                 return response;
             }
 
             if (DryRunMode.Skip($"delete media info for {items.Count} item(s)", Plugin.Instance.Logger))
             {
-                response.Message = "dry run";
+                response.Message = Resources.MediaInfoMenu_DryRun;
                 response.Processed = items.Count;
                 response.Skipped = items.Count;
                 return response;
