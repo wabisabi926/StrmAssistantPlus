@@ -29,6 +29,7 @@ namespace StrmAssistant.Web.Service
             public long Bytes { get; set; }
             public int ExpiredFiles { get; set; }
             public int InvalidFiles { get; set; }
+            public int OrphanCount { get; set; }
             public List<string> Orphans { get; set; } = new List<string>();
             public List<string> ExpiredSamples { get; set; } = new List<string>();
             public List<string> InvalidSamples { get; set; } = new List<string>();
@@ -46,6 +47,8 @@ namespace StrmAssistant.Web.Service
             public ScopeInfo Patches { get; set; } = new ScopeInfo();
             public List<string> MissingMovieCache { get; set; } = new List<string>();
             public List<string> MissingSeriesCache { get; set; } = new List<string>();
+            public int MissingMovieCacheCount { get; set; }
+            public int MissingSeriesCacheCount { get; set; }
             public string Error { get; set; }
         }
 
@@ -59,9 +62,9 @@ namespace StrmAssistant.Web.Service
             if (!response.Enabled) return Resources.GeneralOptions_VerifyMetadataCache_NotEnabled;
             if (!string.IsNullOrEmpty(response.Error)) return response.Error;
 
-            var orphans = response.Cache.Orphans.Count + response.Override.Orphans.Count +
-                          response.Patches.Orphans.Count;
-            var missing = response.MissingMovieCache.Count + response.MissingSeriesCache.Count;
+            var orphans = response.Cache.OrphanCount + response.Override.OrphanCount +
+                          response.Patches.OrphanCount;
+            var missing = response.MissingMovieCacheCount + response.MissingSeriesCacheCount;
 
             return string.Format(Resources.GeneralOptions_VerifyMetadataCache_Result,
                 response.Cache.Files, response.Cache.ExpiredFiles, response.Override.Files,
@@ -96,14 +99,16 @@ namespace StrmAssistant.Web.Service
 
                 var cacheMovieIds = GetFolderIds(root, "cache", "tmdb-movies2");
                 var cacheSeriesIds = GetFolderIds(root, "cache", "tmdb-tv");
-                response.MissingMovieCache = movieIds
+                var missingMovieIds = movieIds
                     .Where(id => !cacheMovieIds.Contains(id))
-                    .Take(MaxSamples)
                     .ToList();
-                response.MissingSeriesCache = seriesIds
+                var missingSeriesIds = seriesIds
                     .Where(id => !cacheSeriesIds.Contains(id))
-                    .Take(MaxSamples)
                     .ToList();
+                response.MissingMovieCacheCount = missingMovieIds.Count;
+                response.MissingSeriesCacheCount = missingSeriesIds.Count;
+                response.MissingMovieCache = missingMovieIds.Take(MaxSamples).ToList();
+                response.MissingSeriesCache = missingSeriesIds.Take(MaxSamples).ToList();
             }
             catch (Exception e)
             {
@@ -132,10 +137,12 @@ namespace StrmAssistant.Web.Service
 
                     if (typeDir == "tmdb-movies2" && !movieIds.Contains(id))
                     {
+                        info.OrphanCount++;
                         AddSample(info.Orphans, $"{scope}/{typeDir}/{id}");
                     }
                     else if (typeDir == "tmdb-tv" && !seriesIds.Contains(id))
                     {
+                        info.OrphanCount++;
                         AddSample(info.Orphans, $"{scope}/{typeDir}/{id}");
                     }
 
