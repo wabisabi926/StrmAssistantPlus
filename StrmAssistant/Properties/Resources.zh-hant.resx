@@ -1,4 +1,4 @@
-<root>
+﻿<root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -54,7 +54,7 @@
     <value>影片截圖</value>
   </data>
   <data name="PluginOptions_EnableImageCapture_Perform_image_capture_for_videos_without_primary_image__Default_is_False_" xml:space="preserve">
-    <value>為無主圖影片截圖，支援 STRM 與 BIF 預覽。預設關閉。</value>
+    <value>為無主圖影片擷取主圖，支援 STRM 與 BIF 預覽；可選主圖裁切與背景圖產生。FFmpeg 並發由外掛統一限制，ISO 截圖不做關鍵影格最佳化。預設關閉。</value>
   </data>
   <data name="PluginOptions_EnableIntroSkip_Enable_Intro_Skip__Experimental_" xml:space="preserve">
     <value>啟用播放偵測</value>
@@ -76,6 +76,9 @@
   </data>
   <data name="IntroSkipOptions_LibraryScope_TV_shows_library_scope_to_detect__Blank_includes_all_" xml:space="preserve">
     <value>劇集/混合庫；留空包含全部。</value>
+  </data>
+  <data name="BrandOptions_PluginVersion" xml:space="preserve">
+    <value>外掛版本：v{0}｜Emby 適配基準：{1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>神醫助手 Plus</value>
@@ -138,7 +141,7 @@
     <value>獨佔提取</value>
   </data>
   <data name="ModOptions_ExclusiveExtract_Only_allow_this_plugin_to_extract_media_info__ffprobe__and_capture_image__ffmpeg___Default_is_OFF_" xml:space="preserve">
-    <value>由外掛接管 ffprobe/ffmpeg，全媒體庫生效。預設關閉。</value>
+    <value>優先由本外掛處理媒體資訊與截圖擷取；原生重新整理無法攔截時，僅對外掛發起的擷取生效。預設關閉。</value>
   </data>
   <data name="Repo_Link" xml:space="preserve">
     <value>項目連結</value>
@@ -165,10 +168,10 @@
     <value>啟用原生片頭偵測</value>
   </data>
   <data name="IntroSkipOptions_UnlockIntroSkip_Unlock_Strm_support_for_built_in_intro_skip_detection" xml:space="preserve">
-    <value>啟用 Emby 原生片頭偵測，支援 STRM。預設關閉。</value>
+    <value>啟用片頭偵測範圍控制並支援 STRM。預設關閉。</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Support_Chinese_fuzzy_search_and_Pinyin_search__Default_is_OFF_" xml:space="preserve">
-    <value>支援中文模糊搜尋和拼音搜索，預設為關閉。</value>
+    <value>啟用中文模糊比對、拼音搜尋，並支援簡繁與常用標點正規化。依賴 Emby SQLite 分詞元件，元件不可用時回退原生搜尋。預設關閉。</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Enhance_Chinese_Search" xml:space="preserve">
     <value>中文搜尋增強</value>
@@ -396,7 +399,7 @@
     <value>偵測片頭指紋</value>
   </data>
   <data name="ExtractIntroFingerprintTask_Description_Extracts_intro_fingerprint_from_episodes" xml:space="preserve">
-    <value>擷取音訊指紋並偵測片頭，寫入片頭標記；不處理片尾；依“片頭指紋偵測媒體庫”範圍執行。</value>
+    <value>擷取音訊指紋並寫入片頭標記，不處理片尾；目前 Emby 已提供原生片頭偵測時，此工作不執行。</value>
   </data>
   <data name="ExtractMediaInfoTask_Name_Extract_MediaInfo" xml:space="preserve">
     <value>擷取媒體資訊</value>
@@ -447,13 +450,13 @@
     <value>代理伺服器</value>
   </data>
   <data name="ModOptions_ProxyServer_Enable_http_proxy_server__Blank_is_OFF_" xml:space="preserve">
-    <value>HTTP(S) 代理；至 Google 延遲需低於 999 ms，留空或測試失敗則停用，修改後需重新啟動。</value>
+    <value>HTTP(S) 代理；通過連線測試後啟用。留空或測試失敗則停用，修改後需重新啟動。</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Proxy_Mode" xml:space="preserve">
     <value>代理模式</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Global_proxies_all_outbound_requests__ScrapeOnly_proxies_only_the_scraping_whitelist_hosts__Default_is_Global_" xml:space="preserve">
-    <value>全域代理所有出站請求；僅刮削模式只代理刮削白名單主機。預設為全域。</value>
+    <value>全域代理出站請求；回環位址和私網 IPv4 直連。僅刮削模式只代理刮削白名單主機。預設為全域。</value>
   </data>
   <data name="ProxyMode_Global_Global" xml:space="preserve">
     <value>全域</value>
@@ -501,7 +504,7 @@
     <value>社群評分來源</value>
   </data>
   <data name="MetadataEnhanceOptions_CommunityRatingSource_Description" xml:space="preserve">
-    <value>將 CommunityRating 統一為所選來源。選豆瓣則由豆瓣分直接接管主評分；選 TMDB 或 IMDb 時豆瓣不修改主評分。 預設不統一。</value>
+    <value>依所選來源統一 CommunityRating。選擇 TMDb 或 IMDb 時由本外掛寫入，選擇豆瓣時由豆瓣評分流程寫入。預設不干預。</value>
   </data>
   <data name="CommunityRatingSourceOption_None_Do_Not_Interfere" xml:space="preserve">
     <value>不干預（保持現狀）</value>
@@ -687,7 +690,7 @@
     <value>隱藏合集媒體庫</value>
   </data>
   <data name="UIFunctionOptions_NoBoxsetsAutoCreation_Prevent_automatic_boxset_library_creation__Default_is_OFF_" xml:space="preserve">
-    <value>使用者介面隱藏合集媒體庫，若刪除可避免掃庫時自動創建，預設為關閉。</value>
+    <value>從使用者檢視隱藏合集媒體庫，並阻止可攔截的自動建立。預設為關閉。</value>
   </data>
   <data name="UIFunctionOptions_OptimizeMediaItemOrder_Optimize_Media_Item_Display_Order" xml:space="preserve">
     <value>最佳化條目顯示排序</value>
@@ -777,7 +780,7 @@
     <value>僅手動暫停設定標記</value>
   </data>
   <data name="IntroSkipControl_ResetAndOverwrite_ResetAndOverwrite" xml:space="preserve">
-    <value>重設時覆蓋後續原生標記</value>
+    <value>重設時覆蓋原生片頭片尾標記</value>
   </data>
   <data name="PluginOptions_IsHarmonyModFailed_Harmony_Mod_Failed" xml:space="preserve">
     <value>魔改失敗，請啟用調試模式日誌，重新啟動後查看日誌排查問題。</value>
@@ -834,7 +837,7 @@
     <value>清除內嵌中繼資料</value>
   </data>
   <data name="MediaInfoExtractOptions_ClearEmbeddedMetadata_Strip_embedded_metadata_from_movie_and_episode_probe_results__Default_is_ON_" xml:space="preserve">
-    <value>移除容器內嵌中繼資料，避免污染項目資訊。預設開啟。</value>
+    <value>清理電影和單集探測結果中的內嵌元資料欄位及內嵌影像；僅獨佔提取模組生效。預設開啟。</value>
   </data>
   <data name="MediaInfoExtractOptions_VideoThumbnailExcludeKeywords_Video_Thumbnail_Exclude_Keywords" xml:space="preserve">
     <value>縮圖排除關鍵字</value>
@@ -864,7 +867,7 @@
     <value>通知系統增強</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnhanceNotification_Show_episode_details_in_series_notification__Default_is_OFF_" xml:space="preserve">
-    <value>按電視節目分組的新增和刪除通知中新增集訊息，提供媒體深度刪除通知，預設為關閉。</value>
+    <value>提供媒體深度刪除、中繼資料、影像與合集變更通知；劇集通知的單集摘要取決於 Emby 通知介面支援情況。預設為關閉。</value>
   </data>
   <data name="MetadataEnhanceOptions_ChineseTvdb_Try_to_get_Chinese_or_Japanese_metadata_from_Tvdb__Default_is_OFF_" xml:space="preserve">
     <value>盡可能從 TVDB 取得中文或日文元數據，預設為關閉。</value>
@@ -1053,7 +1056,7 @@
     <value>同目錄版本合併上限</value>
   </data>
   <data name="ExperienceEnhanceOptions_FolderVideoGroupingLimit_Maximum_number_of_videos_in_the_same_folder_eligible_for_multi_version_merge__8_is_the_Emby_default__Default_is_8_" xml:space="preserve">
-    <value>同一資料夾內可參與多版本合併的影片數量上限。Emby 預設為 8。預設為 8。</value>
+    <value>同一資料夾內可參與多版本合併的影片數量上限。Emby 預設值為 8。</value>
   </data>
   <data name="PluginOptions_CatchupMinWaitSeconds_Min_Wait_After_Library_Insert__Seconds_" xml:space="preserve">
     <value>入庫後最小等待（秒）</value>
@@ -1194,7 +1197,7 @@
     <value>將純英文演員名替換為豆瓣中文名。僅對中文條目生效。 預設關閉。</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanPosterFallback_Description" xml:space="preserve">
-    <value>電影無主圖時使用豆瓣海報。 預設關閉。</value>
+    <value>電影缺少主圖且偏好的元資料語言為中文時，使用豆瓣海報。預設關閉。</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanRefreshIntervalDays_Description" xml:space="preserve">
     <value>條目被檢視或播放時，距上次檢查超過此天數才重新整理。0 表示關閉。 預設 7 天。</value>
@@ -1717,6 +1720,15 @@
   </data>
   <data name="GeneralOptions_VerifyMetadataCache_Result" xml:space="preserve">
     <value>快取 {0} 檔案，過期 {1}；override {2}，patches {3}；孤兒 {4}，缺少快取 {5}</value>
+  </data>
+  <data name="MediaInfoMenu_PluginDisabled" xml:space="preserve">
+    <value>外掛已停用，無法擷取媒體資訊。請先在基礎設定中啟用外掛。</value>
+  </data>
+  <data name="MediaInfoMenu_NoSupportedItems" xml:space="preserve">
+    <value>所選項目中沒有可擷取媒體資訊的電影或單集。</value>
+  </data>
+  <data name="MediaInfoMenu_DryRun" xml:space="preserve">
+    <value>演練模式：未刪除任何媒體資訊。</value>
   </data>
   <data name="GeneralOptions_ConfigTransfer_Exported" xml:space="preserve">
     <value>設定已匯出至：{0}</value>

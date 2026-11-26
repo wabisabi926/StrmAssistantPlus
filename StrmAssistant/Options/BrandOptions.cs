@@ -2,6 +2,7 @@
 using Emby.Web.GenericEdit.Elements;
 using MediaBrowser.Model.LocalizationAttributes;
 using StrmAssistant.Properties;
+using System;
 using System.ComponentModel;
 
 namespace StrmAssistant.Options
@@ -17,7 +18,7 @@ namespace StrmAssistant.Options
 
         [DisplayName("")]
         public LabelItem PluginVersion => new LabelItem(
-            "版本：v" + AboutOptions.GetVersion() +
-            " 💎 Support Emby Server_v" + Plugin.AdvertisedEmbyVersion);
+            string.Format(Resources.BrandOptions_PluginVersion,
+                AboutOptions.GetVersion(), Plugin.AdvertisedEmbyVersion));
     }
 }

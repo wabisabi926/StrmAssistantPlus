@@ -5940,5 +5940,41 @@ namespace StrmAssistant.Properties {
             }
         }
 
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string BrandOptions_PluginVersion {
+            get {
+                return ResourceManager.GetString("BrandOptions_PluginVersion", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string MediaInfoMenu_DryRun {
+            get {
+                return ResourceManager.GetString("MediaInfoMenu_DryRun", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string MediaInfoMenu_NoSupportedItems {
+            get {
+                return ResourceManager.GetString("MediaInfoMenu_NoSupportedItems", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string MediaInfoMenu_PluginDisabled {
+            get {
+                return ResourceManager.GetString("MediaInfoMenu_PluginDisabled", resourceCulture);
+            }
+        }
+
     }
 }

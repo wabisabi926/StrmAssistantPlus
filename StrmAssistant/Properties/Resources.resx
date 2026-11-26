@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <root>
 	<!-- 
 		Microsoft ResX Schema
@@ -141,7 +141,7 @@
     <value>Video Capture</value>
   </data>
   <data name="PluginOptions_EnableImageCapture_Perform_image_capture_for_videos_without_primary_image__Default_is_False_" xml:space="preserve">
-    <value>Capture images for videos without a primary image; supports STRM and BIF previews. Default is OFF.</value>
+    <value>Captures primary images for videos without one; supports STRM and BIF previews, with optional poster cropping and backdrop generation. FFmpeg concurrency is managed by the plugin; ISO capture does not use keyframe-only filtering. Default is OFF.</value>
   </data>
   <data name="PluginOptions_EnableIntroSkip_Enable_Intro_Skip__Experimental_" xml:space="preserve">
     <value>Enable Playback Detection</value>
@@ -163,6 +163,9 @@
   </data>
   <data name="IntroSkipOptions_LibraryScope_TV_shows_library_scope_to_detect__Blank_includes_all_" xml:space="preserve">
     <value>TV and mixed libraries; leave blank to include all.</value>
+  </data>
+  <data name="BrandOptions_PluginVersion" xml:space="preserve">
+    <value>Plugin: v{0} | Emby compatibility baseline: {1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>StrmAssistant Plus</value>
@@ -225,7 +228,7 @@
     <value>Exclusive Extract</value>
   </data>
   <data name="ModOptions_ExclusiveExtract_Only_allow_this_plugin_to_extract_media_info__ffprobe__and_capture_image__ffmpeg___Default_is_OFF_" xml:space="preserve">
-    <value>Let this plugin handle ffprobe/ffmpeg for all libraries. Default is OFF.</value>
+    <value>Prefer plugin-managed media-info and image extraction; when native refresh cannot be intercepted, only plugin-initiated extraction is covered. Default is OFF.</value>
   </data>
   <data name="Repo_Link" xml:space="preserve">
     <value>Repo Link</value>
@@ -252,13 +255,13 @@
     <value>Enable Native Intro Detection</value>
   </data>
   <data name="IntroSkipOptions_UnlockIntroSkip_Unlock_Strm_support_for_built_in_intro_skip_detection" xml:space="preserve">
-    <value>Enable Emby native intro detection with STRM support. Default is OFF.</value>
+    <value>Enables intro-detection scope controls and STRM support. Default is OFF.</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Enhance_Chinese_Search" xml:space="preserve">
     <value>Chinese Search Enhanced</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Support_Chinese_fuzzy_search_and_Pinyin_search__Default_is_OFF_" xml:space="preserve">
-    <value>Support Chinese fuzzy search and Pinyin search. Default is OFF.</value>
+    <value>Enables Chinese fuzzy matching, Pinyin search, and Simplified/Traditional plus punctuation normalization. Falls back to native search when the Emby SQLite tokenizer is unavailable. Default is OFF.</value>
   </data>
   <data name="ItemType_Movie_Movie" xml:space="preserve">
     <value>Movie</value>
@@ -483,7 +486,7 @@
     <value>Detect Intro Fingerprints</value>
   </data>
   <data name="ExtractIntroFingerprintTask_Description_Extracts_intro_fingerprint_from_episodes" xml:space="preserve">
-    <value>Extract audio fingerprints, detect intros, and write intro markers within the fingerprint library scope; credits are not detected.</value>
+    <value>Extracts audio fingerprints and writes intro markers; credits are not processed. This task does not run when Emby provides native intro detection.</value>
   </data>
   <data name="ExtractMediaInfoTask_Name_Extract_MediaInfo" xml:space="preserve">
     <value>Extract Media Info</value>
@@ -534,13 +537,13 @@
     <value>Proxy Server</value>
   </data>
   <data name="ModOptions_ProxyServer_Enable_http_proxy_server__Blank_is_OFF_" xml:space="preserve">
-    <value>HTTP(S) proxy; latency to Google must be under 999 ms. Blank or failed test disables it; restart after changes.</value>
+    <value>HTTP(S) proxy; enabled after a successful connectivity test. Blank or failed test disables it; restart after changes.</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Proxy_Mode" xml:space="preserve">
     <value>Proxy Mode</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Global_proxies_all_outbound_requests__ScrapeOnly_proxies_only_the_scraping_whitelist_hosts__Default_is_Global_" xml:space="preserve">
-    <value>Global proxies all outbound requests; ScrapeOnly proxies only the scraping whitelist hosts. Default is Global.</value>
+    <value>Global proxies outbound requests; loopback and private IPv4 addresses connect directly. ScrapeOnly proxies only scraping whitelist hosts. Default is Global.</value>
   </data>
   <data name="ProxyMode_Global_Global" xml:space="preserve">
     <value>Global</value>
@@ -588,7 +591,7 @@
     <value>Community rating source</value>
   </data>
   <data name="MetadataEnhanceOptions_CommunityRatingSource_Description" xml:space="preserve">
-    <value>Unifies CommunityRating to the selected source. With Douban the Douban score takes over the community rating; with TMDB or IMDb, Douban leaves it untouched. Default is no unification.</value>
+    <value>Unify CommunityRating using the selected source. The plugin writes the selected TMDb or IMDb rating; Douban uses its own rating workflow. Default: Do not interfere.</value>
   </data>
   <data name="CommunityRatingSourceOption_None_Do_Not_Interfere" xml:space="preserve">
     <value>Do not interfere (keep as is)</value>
@@ -774,7 +777,7 @@
     <value>Hide Collection Library</value>
   </data>
   <data name="UIFunctionOptions_NoBoxsetsAutoCreation_Prevent_automatic_boxset_library_creation__Default_is_OFF_" xml:space="preserve">
-    <value>Hide collection library from user views, if removed, prevent auto creation. Default is OFF.</value>
+    <value>Hides the Box Sets library from user views and blocks auto-creation where Emby allows interception. Default is OFF.</value>
   </data>
   <data name="UIFunctionOptions_OptimizeMediaItemOrder_Optimize_Media_Item_Display_Order" xml:space="preserve">
     <value>Optimize Media Item Display Order</value>
@@ -825,7 +828,7 @@
     <value>Skip Persistence Integration</value>
   </data>
   <data name="IntroSkipControl_ResetAndOverwrite_ResetAndOverwrite" xml:space="preserve">
-    <value>Reset overwrites native markers on later episodes</value>
+    <value>Reset overwrites native intro and credits markers</value>
   </data>
   <data name="IntroSkipOptions_IntroSkipPreferences_IntroSkip_Preferences" xml:space="preserve">
     <value>Detection Preferences</value>
@@ -921,7 +924,7 @@
     <value>Clear Embedded Metadata</value>
   </data>
   <data name="MediaInfoExtractOptions_ClearEmbeddedMetadata_Strip_embedded_metadata_from_movie_and_episode_probe_results__Default_is_ON_" xml:space="preserve">
-    <value>Remove embedded container metadata to avoid polluting item metadata. Default is ON.</value>
+    <value>Clears embedded metadata fields and images from movie and episode probe results; applies only when Exclusive Extract is active. Default is ON.</value>
   </data>
   <data name="MediaInfoExtractOptions_VideoThumbnailExcludeKeywords_Video_Thumbnail_Exclude_Keywords" xml:space="preserve">
     <value>Thumbnail Exclude Keywords</value>
@@ -951,7 +954,7 @@
     <value>Notification Enhanced</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnhanceNotification_Show_episode_details_in_series_notification__Default_is_OFF_" xml:space="preserve">
-    <value>Show episode details in add/remove series group notification, provide deep delete notification. Default is OFF.</value>
+    <value>Provides deep delete, metadata, image, and box set change notifications. Series episode summaries depend on Emby notification interface support. Default is OFF.</value>
   </data>
   <data name="MetadataEnhanceOptions_ChineseTvdb_Try_to_get_Chinese_or_Japanese_metadata_from_Tvdb__Default_is_OFF_" xml:space="preserve">
     <value>Try to get Chinese or Japanese metadata from Tvdb. Default is OFF.</value>
@@ -1140,7 +1143,7 @@
     <value>Folder Video Grouping Limit</value>
   </data>
   <data name="ExperienceEnhanceOptions_FolderVideoGroupingLimit_Maximum_number_of_videos_in_the_same_folder_eligible_for_multi_version_merge__8_is_the_Emby_default__Default_is_8_" xml:space="preserve">
-    <value>Maximum number of videos in the same folder eligible for multi-version merge. 8 is the Emby default. Default is 8.</value>
+    <value>Maximum number of videos in the same folder eligible for multi-version merge. The Emby default is 8.</value>
   </data>
   <data name="PluginOptions_CatchupMinWaitSeconds_Min_Wait_After_Library_Insert__Seconds_" xml:space="preserve">
     <value>Min Wait After Library Insert (Seconds)</value>
@@ -1281,7 +1284,7 @@
     <value>Replaces English-only cast names with Douban Chinese names. Chinese items only. Default is OFF.</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanPosterFallback_Description" xml:space="preserve">
-    <value>Uses the Douban poster when a movie has no primary image. Default is OFF.</value>
+    <value>Uses the Douban poster when a movie has no primary image and its preferred metadata language is Chinese. Default is OFF.</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanRefreshIntervalDays_Description" xml:space="preserve">
     <value>Refreshes when an item is viewed or played and the last check is older than this many days. 0 disables it. Default is 7 days.</value>
@@ -1804,6 +1807,15 @@
   </data>
   <data name="GeneralOptions_VerifyMetadataCache_Result" xml:space="preserve">
     <value>Cache: {0} files, {1} expired; override: {2}, patches: {3}; orphans: {4}, missing: {5}</value>
+  </data>
+  <data name="MediaInfoMenu_PluginDisabled" xml:space="preserve">
+    <value>The plugin is disabled. Enable it in Basic Settings before extracting media info.</value>
+  </data>
+  <data name="MediaInfoMenu_NoSupportedItems" xml:space="preserve">
+    <value>The selection contains no movies or episodes that support media info extraction.</value>
+  </data>
+  <data name="MediaInfoMenu_DryRun" xml:space="preserve">
+    <value>Dry run: no media info was deleted.</value>
   </data>
   <data name="GeneralOptions_ConfigTransfer_Exported" xml:space="preserve">
     <value>Config exported to: {0}</value>

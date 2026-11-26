@@ -1,19 +1,32 @@
 using StrmAssistant.Options;
+using System;
+using System.Globalization;
 using Xunit;
 
 namespace StrmAssistant.Tests
 {
     public class BrandOptionsTests
     {
-        [Fact]
-        public void BrandLine_UsesEmbyServerVersion()
+        [Theory]
+        [InlineData("zh-CN", "插件版本：v{0}｜Emby 适配基线：4.11.0.19")]
+        [InlineData("zh-Hant", "外掛版本：v{0}｜Emby 適配基準：4.11.0.19")]
+        [InlineData("en-US", "Plugin: v{0} | Emby compatibility baseline: 4.11.0.19")]
+        public void BrandLine_UsesLocalizedProfessionalFormat(string cultureName, string template)
         {
-            var text = new BrandOptions().PluginVersion.Text;
+            var original = CultureInfo.CurrentUICulture;
+            try
+            {
+                CultureInfo.CurrentUICulture = new CultureInfo(cultureName);
+                var text = new BrandOptions().PluginVersion.Text;
 
-            Assert.Contains("Support Emby Server_v4.10.2.0", text);
-            Assert.DoesNotContain("Support 4.", text);
-            // 品牌行结尾不再带 " +"（空格加号）
-            Assert.DoesNotContain("+", text);
+                Assert.Equal(string.Format(template, AboutOptions.GetVersion()), text);
+                Assert.DoesNotContain("💎", text);
+                Assert.DoesNotContain("+", text);
+            }
+            finally
+            {
+                CultureInfo.CurrentUICulture = original;
+            }
         }
 
         [Fact]
@@ -33,7 +46,7 @@ namespace StrmAssistant.Tests
             var text = new BrandOptions().PluginVersion.Text;
             var version = AboutOptions.GetVersion();
 
-            Assert.Contains("版本：v" + version, text);
+            Assert.Contains("v" + version, text);
         }
     }
 }

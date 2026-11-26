@@ -3,21 +3,22 @@
 ## 环境
 
 - .NET SDK：插件目标 `net6.0`，测试目标 `net8.0`，两个 SDK 都要装
-- 一个可重启的 Emby 4.9.1.90+ 实例（当前开发基线 4.10.2.0）
+- 一个可重启的 Emby 4.11.0.19 实例，并保留 4.10.2.0 作为回归基准
 
 ## 构建与测试
 
 ```bash
-# 构建：默认自动部署到当前运行实例（见 csproj 的 StrmAssistantPluginOutputDir）
-dotnet build StrmAssistant/StrmAssistant.csproj -c Release
+# 安全构建：不自动部署到 Emby
+dotnet build StrmAssistant/StrmAssistant.csproj -c Release -p:StrmAssistantPluginOutputDir=
 
-# 部署到其他实例时显式覆盖
+# 需要部署时显式指定目标插件目录
 dotnet build StrmAssistant/StrmAssistant.csproj -c Release -p:StrmAssistantPluginOutputDir=<plugins 目录>
 
 # 发布包：bin/Release/net6.0/StrmAssistantPlus_v<版本>.dll
 
-# 测试
-dotnet test StrmAssistant.Tests/StrmAssistant.Tests.csproj -c Release
+# 测试：先构建测试项目，再使用已构建产物运行
+dotnet build StrmAssistant.Tests/StrmAssistant.Tests.csproj -c Release
+dotnet test StrmAssistant.Tests/StrmAssistant.Tests.csproj -c Release --no-build
 ```
 
 两个顺序约束：
@@ -54,7 +55,7 @@ dotnet test StrmAssistant.Tests/StrmAssistant.Tests.csproj -c Release
 
 - [ ] `dotnet build` **0 警告 0 错误**
 - [ ] 构建输出 `[OK] resx keys consistent`
-- [ ] `dotnet test` 全绿（当前基线：509 通过 / 0 跳过）
+- [ ] `dotnet test` 全绿（当前基线：627 通过 / 0 跳过）
 - [ ] 涉及 Emby 内部行为的改动，在真机上验证过，并把日志原文贴进提交信息
 - [ ] 新增选项同步了三语 resx（Designer 会自动补）
 

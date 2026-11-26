@@ -19,10 +19,10 @@ Community Edition based on StrmAssistant, continuously adapted to the latest Emb
 |---|---|
 | Plugin Version | **4.0.1.2** |
 | Minimum Emby Version | 4.9.1.0 |
-| Advertised Version | 4.10.2.0 |
-| Tested On | 4.10.2.0 |
+| Advertised Version | 4.11.0.19 |
+| Tested On | 4.10.2.0 / 4.11.0.19 |
 | Target Framework | .NET 6.0 |
-| Architecture | x64 / ARM64 (all features) |
+| Architecture | x64 (tested in this round) / ARM64 (legacy path retained) |
 
 > See [CHANGELOG.md](CHANGELOG.md) for per-version details.
 
@@ -181,25 +181,25 @@ Community Edition based on StrmAssistant, continuously adapted to the latest Emb
 
 ## Previous Optimizations (v26.3.25)
 
-✅ **Full ARM64/aarch64 support (2026-09)**
-- **Harmony 2.4.2**: upgraded Lib.Harmony 2.3.6 → 2.4.2, fixing `NotImplementedException` on every patch on arm64
+✅ **ARM64/aarch64 compatibility path (2026-09)**
+- **Harmony 2.4.2**: upgraded Lib.Harmony 2.3.6 → 2.4.2, fixing `NotImplementedException` in patches on arm64
 - **Chinese search enhancement on arm64**: built arm64 `libsimple.so` (SQLite FTS5 Chinese/Pinyin tokenizer)
 - **libsimple source integrated**: full source + one-click build script in `Tokenizer/libsimple-src/`
 
-✅ **Complete Architecture Refactoring**
-- New `EmbyVersionAdapter` for intelligent version detection and adaptation
+✅ **Architecture refactoring**
+- New `EmbyVersionAdapter` for Emby version detection and adaptation
 - `ServiceLocator` for unified global service management
 - Enhanced `PatchTracker` with detailed patch status tracking
 
-✅ **Full Support for Emby 4.9.1.90 / 4.10.0.29**
-- Optimized API calls specifically for 4.9.1.90 and 4.10.0.29
-- Support for latest MediaSources and notification system enhancements
-- Supports Emby 4.9.1 and above only
+✅ **Historical adaptation for Emby 4.9.1.90 / 4.10.0.29**
+- Optimized API calls for 4.9.1.90 and 4.10.0.29
+- Adapted to the MediaSources and notification interfaces of those versions
+- These are historical baselines; see Compatibility for the current scope
 
-✅ **Enhanced Error Handling**
+✅ **Enhanced error handling**
 - More detailed diagnostic logging and error tracking
-- Multi-layer fallback mechanism: Harmony → Reflection → PublicAPI
-- Intelligent feature degradation with core functionality guaranteed
+- Multi-layer fallback: Harmony → Reflection → Public API
+- Degrades by available capability; see Compatibility for current limits
 
 ## Features
 
@@ -278,7 +278,7 @@ An **option search box** at the top-left of the settings page filters options by
 
 ## Install
 
-1. Download `StrmAssistant.dll` into Emby's `plugins` folder
+1. Download the DLL from Releases, rename it to `StrmAssistantPlus.dll`, and place it in Emby's `plugins` folder
 2. Restart Emby
 3. Check the plugin version and configure settings on the Plugins page
 
@@ -290,17 +290,17 @@ The plugin adapts dynamically: it detects the Emby version at startup, prefers H
 
 | Emby Version | Status | Notes |
 |---|---|---|
-| 4.10.2.x | ✅ Full | Current target and tested version |
-| 4.10.1.x | ✅ Full | Tested (previous baseline) |
-| 4.10.0.x | ✅ Full | Tested on x64 (all modules Harmony + Chinese search) |
-| 4.9.1.90+ | ✅ Full | Recommended, best performance |
-| 4.9.1.0–89 | ✅ Supported | Some features may degrade |
+| 4.11.0.19 | ✅ Tested | Core capabilities restored; batch DTO, notification summaries, ExclusiveExtract and other limits are documented |
+| 4.10.2.0 | ✅ Tested | Current regression baseline |
+| 4.10.1.x | ✅ Legacy baseline | Previously tested; not revalidated in this round |
+| 4.10.0.x | ✅ Legacy baseline | Previously tested; not revalidated in this round |
+| 4.9.1.x | ⚠️ Legacy path retained | Not revalidated in this round; full feature parity is not claimed |
 | < 4.9.1.0 | ❌ Unsupported | Compatibility logic removed |
 
 | Architecture | Status | Notes |
 |---|---|---|
-| x86-64 / x64 | ✅ Full | All features available |
-| ARM64 / aarch64 | ✅ Full | Requires Harmony 2.4.2+, incl. Chinese search |
+| x86-64 / x64 | ✅ Tested in this round | 4.10.2.0 and 4.11.0.19 |
+| ARM64 / aarch64 | ⚠️ Legacy path retained | Not revalidated in this round |
 
 > ISO extraction: Emby's third-party `IsoMounter` plugin is incompatible with 4.10 and blocks ISO probing; disable or remove it. This plugin does not depend on it. Local ISOs need no mount on Linux/Docker, and Windows falls back to title sampling when mounting fails.
 

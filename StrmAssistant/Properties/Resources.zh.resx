@@ -1,4 +1,4 @@
-<root>
+﻿<root>
   <resheader name="resmimetype">
     <value>text/microsoft-resx</value>
   </resheader>
@@ -54,7 +54,7 @@
     <value>视频截图</value>
   </data>
   <data name="PluginOptions_EnableImageCapture_Perform_image_capture_for_videos_without_primary_image__Default_is_False_" xml:space="preserve">
-    <value>为无主图视频截图，支持 STRM 与 BIF 预览。默认关闭。</value>
+    <value>为无主图视频截取主图，支持 STRM 与 BIF 预览；可选主图裁剪与背景图生成。FFmpeg 并发由插件统一限制，ISO 截图不做关键帧优化。默认关闭。</value>
   </data>
   <data name="PluginOptions_EnableIntroSkip_Enable_Intro_Skip__Experimental_" xml:space="preserve">
     <value>启用播放探测</value>
@@ -76,6 +76,9 @@
   </data>
   <data name="IntroSkipOptions_LibraryScope_TV_shows_library_scope_to_detect__Blank_includes_all_" xml:space="preserve">
     <value>剧集/混合库；留空包含全部。</value>
+  </data>
+  <data name="BrandOptions_PluginVersion" xml:space="preserve">
+    <value>插件版本：v{0}｜Emby 适配基线：{1}</value>
   </data>
   <data name="PluginOptions_EditorTitle_Strm_Assistant" xml:space="preserve">
     <value>神医助手 Plus</value>
@@ -138,7 +141,7 @@
     <value>独占提取</value>
   </data>
   <data name="ModOptions_ExclusiveExtract_Only_allow_this_plugin_to_extract_media_info__ffprobe__and_capture_image__ffmpeg___Default_is_OFF_" xml:space="preserve">
-    <value>由插件接管 ffprobe/ffmpeg，全库生效。默认关闭。</value>
+    <value>优先由本插件处理媒体信息与截图提取；原生刷新不可拦截时，仅对插件发起的提取生效。默认关闭。</value>
   </data>
   <data name="Repo_Link" xml:space="preserve">
     <value>项目链接</value>
@@ -165,13 +168,13 @@
     <value>启用原生片头探测</value>
   </data>
   <data name="IntroSkipOptions_UnlockIntroSkip_Unlock_Strm_support_for_built_in_intro_skip_detection" xml:space="preserve">
-    <value>启用 Emby 原生片头检测，支持 STRM。默认关闭。</value>
+    <value>启用片头检测范围控制并支持 STRM。默认关闭。</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Enhance_Chinese_Search" xml:space="preserve">
     <value>中文搜索增强</value>
   </data>
   <data name="ModOptions_EnhanceChineseSearch_Support_Chinese_fuzzy_search_and_Pinyin_search__Default_is_OFF_" xml:space="preserve">
-    <value>支持中文模糊搜索和拼音搜索，默认关闭。</value>
+    <value>启用中文模糊匹配、拼音检索，并支持简繁与常用标点归一化。依赖 Emby SQLite 分词组件，组件不可用时回退原生搜索。默认关闭。</value>
   </data>
   <data name="ItemType_Movie_Movie" xml:space="preserve">
     <value>电影</value>
@@ -396,7 +399,7 @@
     <value>检测片头指纹</value>
   </data>
   <data name="ExtractIntroFingerprintTask_Description_Extracts_intro_fingerprint_from_episodes" xml:space="preserve">
-    <value>提取音频指纹并检测片头，写入片头标记；不处理片尾；按“片头指纹检测媒体库”范围执行。</value>
+    <value>提取音频指纹并写入片头标记，不处理片尾；当前 Emby 已提供原生片头检测时，此任务不执行。</value>
   </data>
   <data name="ExtractMediaInfoTask_Name_Extract_MediaInfo" xml:space="preserve">
     <value>提取媒体信息</value>
@@ -447,13 +450,13 @@
     <value>代理服务器</value>
   </data>
   <data name="ModOptions_ProxyServer_Enable_http_proxy_server__Blank_is_OFF_" xml:space="preserve">
-    <value>HTTP(S) 代理；到 Google 延迟需低于 999 ms，留空或测试失败则禁用，修改后需重启。</value>
+    <value>HTTP(S) 代理；通过连通性测试后启用。留空或测试失败则停用，修改后需重启。</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Proxy_Mode" xml:space="preserve">
     <value>代理模式</value>
   </data>
   <data name="NetworkOptions_ProxyMode_Global_proxies_all_outbound_requests__ScrapeOnly_proxies_only_the_scraping_whitelist_hosts__Default_is_Global_" xml:space="preserve">
-    <value>全局代理所有出站请求；仅刮削模式只代理刮削白名单主机。默认为全局。</value>
+    <value>全局代理出站请求；回环地址和私网 IPv4 直连。仅刮削模式只代理刮削白名单主机。默认为全局。</value>
   </data>
   <data name="ProxyMode_Global_Global" xml:space="preserve">
     <value>全局</value>
@@ -501,7 +504,7 @@
     <value>社区评分来源</value>
   </data>
   <data name="MetadataEnhanceOptions_CommunityRatingSource_Description" xml:space="preserve">
-    <value>将 CommunityRating 统一为所选来源。选豆瓣则由豆瓣分直接接管社区评分；选 TMDB 或 IMDb 时豆瓣不修改社区评分。 默认不统一。</value>
+    <value>按所选来源统一 CommunityRating。选择 TMDb 或 IMDb 时由本插件写入，选择豆瓣时由豆瓣评分流程写入。默认不干预。</value>
   </data>
   <data name="CommunityRatingSourceOption_None_Do_Not_Interfere" xml:space="preserve">
     <value>不干预（保持现状）</value>
@@ -687,7 +690,7 @@
     <value>隐藏合集媒体库</value>
   </data>
   <data name="UIFunctionOptions_NoBoxsetsAutoCreation_Prevent_automatic_boxset_library_creation__Default_is_OFF_" xml:space="preserve">
-    <value>用户界面隐藏合集媒体库，若删除可避免扫库时自动创建，默认关闭。</value>
+    <value>从用户视图隐藏合集媒体库，并阻止可拦截的自动创建。默认关闭。</value>
   </data>
   <data name="UIFunctionOptions_OptimizeMediaItemOrder_Optimize_Media_Item_Display_Order" xml:space="preserve">
     <value>优化条目显示排序</value>
@@ -738,7 +741,7 @@
     <value>跳过持久化整合</value>
   </data>
   <data name="IntroSkipControl_ResetAndOverwrite_ResetAndOverwrite" xml:space="preserve">
-    <value>重置时覆盖后续原生标记</value>
+    <value>重置时覆盖原生片头片尾标记</value>
   </data>
   <data name="IntroSkipOptions_IntroSkipPreferences_IntroSkip_Preferences" xml:space="preserve">
     <value>探测偏好</value>
@@ -834,7 +837,7 @@
     <value>清除内嵌元数据</value>
   </data>
   <data name="MediaInfoExtractOptions_ClearEmbeddedMetadata_Strip_embedded_metadata_from_movie_and_episode_probe_results__Default_is_ON_" xml:space="preserve">
-    <value>移除容器内嵌元数据，避免污染条目信息。默认开启。</value>
+    <value>清理电影和单集探测结果中的内嵌元数据字段及内嵌图像；仅独占提取模块生效。默认开启。</value>
   </data>
   <data name="MediaInfoExtractOptions_VideoThumbnailExcludeKeywords_Video_Thumbnail_Exclude_Keywords" xml:space="preserve">
     <value>缩略图排除关键字</value>
@@ -864,7 +867,7 @@
     <value>通知系统增强</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnhanceNotification_Show_episode_details_in_series_notification__Default_is_OFF_" xml:space="preserve">
-    <value>按电视节目分组的新增和删除通知中添加集信息，提供媒体深度删除通知，默认关闭。</value>
+    <value>提供媒体深度删除、元数据、图像与合集变更通知；剧集通知的单集摘要取决于 Emby 通知接口支持情况。默认关闭。</value>
   </data>
   <data name="MetadataEnhanceOptions_ChineseTvdb_Try_to_get_Chinese_or_Japanese_metadata_from_Tvdb__Default_is_OFF_" xml:space="preserve">
     <value>尽可能从 TVDB 获取中文或日文元数据，默认关闭。</value>
@@ -1053,7 +1056,7 @@
     <value>同目录版本合并上限</value>
   </data>
   <data name="ExperienceEnhanceOptions_FolderVideoGroupingLimit_Maximum_number_of_videos_in_the_same_folder_eligible_for_multi_version_merge__8_is_the_Emby_default__Default_is_8_" xml:space="preserve">
-    <value>同一文件夹内可参与多版本合并的视频数量上限。Emby 默认为 8。默认为 8。</value>
+    <value>同一文件夹内可参与多版本合并的视频数量上限。Emby 默认值为 8。</value>
   </data>
   <data name="PluginOptions_CatchupMinWaitSeconds_Min_Wait_After_Library_Insert__Seconds_" xml:space="preserve">
     <value>入库后最小等待（秒）</value>
@@ -1194,7 +1197,7 @@
     <value>将纯英文演员名替换为豆瓣中文名。仅对中文条目生效。 默认关闭。</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanPosterFallback_Description" xml:space="preserve">
-    <value>电影无主图时使用豆瓣海报。 默认关闭。</value>
+    <value>电影缺少主图且首选元数据语言为中文时，使用豆瓣海报。默认关闭。</value>
   </data>
   <data name="MetadataEnhanceOptions_DoubanRefreshIntervalDays_Description" xml:space="preserve">
     <value>条目被查看或播放时，距上次检查超过此天数才刷新。0 表示关闭。 默认 7 天。</value>
@@ -1717,6 +1720,15 @@
   </data>
   <data name="GeneralOptions_VerifyMetadataCache_Result" xml:space="preserve">
     <value>缓存 {0} 文件，过期 {1}；override {2}，patches {3}；孤儿 {4}，缺缓存 {5}</value>
+  </data>
+  <data name="MediaInfoMenu_PluginDisabled" xml:space="preserve">
+    <value>插件已停用，无法提取媒体信息。请先在基础设置中启用插件。</value>
+  </data>
+  <data name="MediaInfoMenu_NoSupportedItems" xml:space="preserve">
+    <value>所选条目中没有可提取媒体信息的电影或单集。</value>
+  </data>
+  <data name="MediaInfoMenu_DryRun" xml:space="preserve">
+    <value>演练模式：未删除任何媒体信息。</value>
   </data>
   <data name="GeneralOptions_ConfigTransfer_Exported" xml:space="preserve">
     <value>已导出配置：{0}</value>
