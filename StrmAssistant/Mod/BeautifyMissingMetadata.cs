@@ -138,7 +138,7 @@ namespace StrmAssistant.Mod
         [HarmonyPostfix]
         private static void GetBaseItemDtosPostfix(BaseItem[] items, ref BaseItemDto[] __result)
         {
-            if (items.Length == 0) return;
+            if (items == null || items.Length == 0 || __result == null) return;
 
             var checkItem = items.FirstOrDefault();
 
@@ -187,12 +187,20 @@ namespace StrmAssistant.Mod
         private static void GetBaseItemDtoPostfix(BaseItem item, DtoOptions options, User user,
             ref BaseItemDto __result)
         {
-            if (item is Episode && item.IndexNumber.HasValue &&
-                item.GetPreferredMetadataLanguage().Equals("zh-CN", StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(item.Name, item.FileNameWithoutExtension, StringComparison.Ordinal))
+            if (item is Episode episode && __result != null &&
+                ShouldBeautifyEpisode(episode.IndexNumber, episode.Name, episode.FileNameWithoutExtension,
+                    episode.GetPreferredMetadataLanguage(), __result))
             {
-                __result.Name = $"第 {item.IndexNumber} 集";
+                __result.Name = $"第 {episode.IndexNumber} 集";
             }
+        }
+
+        internal static bool ShouldBeautifyEpisode(int? indexNumber, string itemName, string fileNameWithoutExtension,
+            string preferredMetadataLanguage, BaseItemDto dto)
+        {
+            return indexNumber.HasValue && dto != null &&
+                   string.Equals(preferredMetadataLanguage, "zh-CN", StringComparison.OrdinalIgnoreCase) &&
+                   string.Equals(itemName, fileNameWithoutExtension, StringComparison.Ordinal);
         }
 
         [HarmonyPostfix]
