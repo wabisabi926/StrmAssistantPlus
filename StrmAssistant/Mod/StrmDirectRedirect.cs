@@ -10,6 +10,7 @@ using MediaBrowser.Model.MediaInfo;
 using MediaBrowser.Model.Services;
 using StrmAssistant.Common;
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -41,6 +42,8 @@ namespace StrmAssistant.Mod
         private static bool _follow302;
         private static string[] _videoClientBlacklist = Array.Empty<string>();
         private static string[] _audioClientBlacklist = Array.Empty<string>();
+        private static readonly ConcurrentDictionary<string, (DateTime Expiry, string Url)> RedirectCache =
+            new ConcurrentDictionary<string, (DateTime, string)>(StringComparer.OrdinalIgnoreCase);
 
         public StrmDirectRedirect()
         {
@@ -239,20 +242,34 @@ namespace StrmAssistant.Mod
                     return true;
                 }
 
-                var finalUrl = ResolveRedirectUrl(mediaSource.Path, requestContext?.UserAgent);
-
-                __result = Task.FromResult(resultFactory.GetRedirectResult(finalUrl));
-
-                Plugin.Instance.Logger.Info(
-                    $"StrmDirectRedirect: itemId={itemId}, type={(isVideo ? (isLiveTv ? "LIVE" : "VIDEO") : "AUDIO")}, target={UrlSanitizer.ToLogSafe(finalUrl)}");
-
-                DisposeState(state);
+                __result = ResolveRedirectAsync(resultFactory, mediaSource.Path, requestContext?.UserAgent,
+                    state, itemId, isVideo, isLiveTv);
                 return false;
             }
             catch (Exception e)
             {
                 Plugin.Instance.Logger.Warn($"StrmDirectRedirect 预判失败，回退 Emby 中转: itemId={itemId}, error={e.Message}");
                 return true;
+            }
+        }
+
+        private static async Task<object> ResolveRedirectAsync(IHttpResultFactory resultFactory, string url,
+            string userAgent, object state, string itemId, bool isVideo, bool isLiveTv)
+        {
+            try
+            {
+                var finalUrl = await ResolveRedirectUrlAsync(url, userAgent).ConfigureAwait(false);
+                Plugin.Instance.Logger.Info(
+                    $"StrmDirectRedirect: itemId={itemId}, type={(isVideo ? (isLiveTv ? "LIVE" : "VIDEO") : "AUDIO")}, target={UrlSanitizer.ToLogSafe(finalUrl)}");
+                return resultFactory.GetRedirectResult(finalUrl);
+            }
+            catch
+            {
+                return resultFactory.GetRedirectResult(NormalizeRedirectUrl(url));
+            }
+            finally
+            {
+                DisposeState(state);
             }
         }
 
@@ -518,7 +535,7 @@ namespace StrmAssistant.Mod
             }
         }
 
-        private static string ResolveRedirectUrl(string url, string userAgent)
+        private static async Task<string> ResolveRedirectUrlAsync(string url, string userAgent)
         {
             var normalized = NormalizeRedirectUrl(url);
 
@@ -527,13 +544,16 @@ namespace StrmAssistant.Mod
             var httpClient = Plugin.HttpClient;
             if (httpClient == null || string.IsNullOrWhiteSpace(normalized)) return normalized;
 
+            if (RedirectCache.TryGetValue(normalized, out var cached) && cached.Expiry > DateTime.UtcNow)
+                return cached.Url;
+
             string redirected = null;
 
-            foreach (var method in new[] { "GET", "HEAD" })
+            foreach (var method in new[] { "HEAD", "GET" })
             {
                 try
                 {
-                    using var response = httpClient.SendAsync(new HttpRequestOptions
+                    using var response = await httpClient.SendAsync(new HttpRequestOptions
                     {
                         Url = normalized,
                         UserAgent = userAgent ?? string.Empty,
@@ -543,10 +563,10 @@ namespace StrmAssistant.Mod
                         LogRequest = false,
                         LogResponse = false,
                         EnableHttpCompression = false,
-                        EnableKeepAlive = false,
+                        EnableKeepAlive = true,
                         EnableDefaultUserAgent = false,
                         ThrowOnErrorResponse = false
-                    }, method).GetAwaiter().GetResult();
+                    }, method).ConfigureAwait(false);
 
                     if (response != null && !string.IsNullOrWhiteSpace(response.ResponseUrl))
                     {
@@ -560,7 +580,14 @@ namespace StrmAssistant.Mod
                 }
             }
 
-            return string.IsNullOrWhiteSpace(redirected) ? normalized : redirected;
+            var result = string.IsNullOrWhiteSpace(redirected) ? normalized : redirected;
+            if (RedirectCache.Count > 256)
+            {
+                foreach (var key in RedirectCache.Where(p => p.Value.Expiry <= DateTime.UtcNow).Select(p => p.Key).ToArray())
+                    RedirectCache.TryRemove(key, out _);
+            }
+            RedirectCache[normalized] = (DateTime.UtcNow.AddSeconds(30), result);
+            return result;
         }
 
         private static string NormalizeRedirectUrl(string url)

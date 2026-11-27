@@ -36,6 +36,12 @@ namespace StrmAssistant.Common
         /// </summary>
         private const int MaxMetadataProbeClips = 4096;
 
+        /// <summary>单个蓝光 playlist 元数据文件的最大字节数，异常镜像不得触发无界读取。</summary>
+        private const int MaxPlaylistMetadataBytes = 4 * 1024 * 1024;
+
+        /// <summary>单次最多检查的 playlist 数量，避免异常目录遍历耗尽时间。</summary>
+        private const int MaxPlaylistFiles = 128;
+
         /// <summary>单次元数据采样最多包含的片段数（均匀抽取，代价与总段数无关）。</summary>
         internal const int MetadataSampleMaxClips = 256;
 
@@ -455,9 +461,25 @@ namespace StrmAssistant.Common
             PlaylistEntry best = null;
             var hadParsedPlaylist = false;
 
-            foreach (var path in fs.GetFiles(BlurayPlaylistDir))
+            var playlistPaths = fs.GetFiles(BlurayPlaylistDir)
+                .Where(path => path.EndsWith(".mpls", StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            var checkedPlaylists = 0;
+
+            foreach (var path in playlistPaths)
             {
-                if (!path.EndsWith(".mpls", StringComparison.OrdinalIgnoreCase)) continue;
+                if (++checkedPlaylists > MaxPlaylistFiles)
+                {
+                    Plugin.Instance?.Logger?.Info($"UdfTitleResolver - playlist scan capped at {MaxPlaylistFiles} files");
+                    break;
+                }
+
+                var metadataLength = fs.GetFileLength(path);
+                if (metadataLength <= 0 || metadataLength > MaxPlaylistMetadataBytes)
+                {
+                    Plugin.Instance?.Logger?.Info($"UdfTitleResolver - skipped playlist {path}: invalid metadata length {metadataLength}");
+                    continue;
+                }
 
                 PlaylistEntry entry = null;
                 try
@@ -1187,9 +1209,15 @@ namespace StrmAssistant.Common
 
             public byte[] ReadAllBytes(string relativePath)
             {
+                var length = GetFileLength(relativePath);
+                if (length <= 0 || length > MaxPlaylistMetadataBytes)
+                    throw new InvalidDataException($"metadata file exceeds the {MaxPlaylistMetadataBytes}-byte limit");
+
                 using var source = _udf.OpenFile(relativePath, FileMode.Open, FileAccess.Read);
                 using var buffer = new MemoryStream();
                 source.CopyTo(buffer);
+                if (buffer.Length > MaxPlaylistMetadataBytes)
+                    throw new InvalidDataException($"metadata file exceeds the {MaxPlaylistMetadataBytes}-byte limit");
                 return buffer.ToArray();
             }
 
@@ -1236,7 +1264,14 @@ namespace StrmAssistant.Common
                 }
             }
 
-            public byte[] ReadAllBytes(string relativePath) => File.ReadAllBytes(ToLocal(relativePath));
+            public byte[] ReadAllBytes(string relativePath)
+            {
+                var path = ToLocal(relativePath);
+                var length = new FileInfo(path).Length;
+                if (length <= 0 || length > MaxPlaylistMetadataBytes)
+                    throw new InvalidDataException($"metadata file exceeds the {MaxPlaylistMetadataBytes}-byte limit");
+                return File.ReadAllBytes(path);
+            }
 
             private string ToLocal(string relativePath) => Path.Combine(_root, relativePath);
 

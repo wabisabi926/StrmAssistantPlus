@@ -879,6 +879,7 @@ namespace StrmAssistant
             MemoryGuard.Stop();
             MemoryCleaner.DisposeInstance();
             PerformanceReporter.DisposeInstance();
+            LibraryApi.FlushForceReExtract();
             PatchManager.Shutdown();
             Common.IsoMounter.DismountAll();
         }

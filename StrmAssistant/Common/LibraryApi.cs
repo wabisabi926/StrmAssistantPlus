@@ -54,6 +54,7 @@ namespace StrmAssistant.Common
         private static readonly object ForceReExtractLock = new object();
         private static readonly HashSet<long> ForceReExtractIds = new HashSet<long>();
         private static bool _forceReExtractLoaded;
+        private static int _forceReExtractPendingWrites;
 
         private static string ForceReExtractPath()
         {
@@ -96,7 +97,16 @@ namespace StrmAssistant.Common
                     return;
                 }
 
-                File.WriteAllLines(path, ForceReExtractIds.Select(id => id.ToString()));
+                var tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
+                try
+                {
+                    File.WriteAllLines(tempPath, ForceReExtractIds.Select(id => id.ToString()));
+                    AtomicFileReplacer.Replace(tempPath, path);
+                }
+                finally
+                {
+                    if (File.Exists(tempPath)) File.Delete(tempPath);
+                }
             }
             catch
             {
@@ -110,7 +120,25 @@ namespace StrmAssistant.Common
             lock (ForceReExtractLock)
             {
                 EnsureForceReExtractLoaded();
-                if (ForceReExtractIds.Add(internalId)) SaveForceReExtract();
+                if (ForceReExtractIds.Add(internalId)) RequestForceReExtractSave();
+            }
+        }
+
+        private static void RequestForceReExtractSave()
+        {
+            _forceReExtractPendingWrites++;
+            if (_forceReExtractPendingWrites < 64) return;
+            _forceReExtractPendingWrites = 0;
+            SaveForceReExtract();
+        }
+
+        public static void FlushForceReExtract()
+        {
+            lock (ForceReExtractLock)
+            {
+                if (_forceReExtractPendingWrites == 0) return;
+                _forceReExtractPendingWrites = 0;
+                SaveForceReExtract();
             }
         }
 
@@ -139,7 +167,7 @@ namespace StrmAssistant.Common
             lock (ForceReExtractLock)
             {
                 EnsureForceReExtractLoaded();
-                if (ForceReExtractIds.Remove(internalId)) SaveForceReExtract();
+                if (ForceReExtractIds.Remove(internalId)) RequestForceReExtractSave();
             }
         }
 
@@ -510,6 +538,7 @@ namespace StrmAssistant.Common
 
             if (items.Count == 0)
             {
+                FlushForceReExtract();
                 MediaInfoRetryQueue.Save(true);
                 _logger.Info("MediaInfoExtract - Auto catch-up: nothing to extract");
                 return;
@@ -626,6 +655,7 @@ namespace StrmAssistant.Common
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
+            FlushForceReExtract();
             MediaInfoRetryQueue.Save(true);
 
             _logger.Info("MediaInfoExtract - Auto catch-up completed, pending retry: " +
@@ -728,62 +758,58 @@ namespace StrmAssistant.Common
             if (!libraryIds.Any() || (libraryIds.Any(id => id != "-1") &&
                                        libraries.Any(l => l.Locations != null && l.Locations.Any(p => !string.IsNullOrWhiteSpace(p)))))
             {
-                var itemsMediaInfoQuery = new InternalItemsQuery
+                var candidateQuery = new InternalItemsQuery
                 {
                     HasPath = true,
-                    HasAudioStream = false,
                     MediaTypes = new[] { MediaType.Video, MediaType.Audio }
                 };
 
                 if (libraryIds.Any(id => id != "-1"))
                 {
-                    itemsMediaInfoQuery.PathStartsWithAny = libraries.SelectMany(l => l.Locations ?? Array.Empty<string>()).Where(p => !string.IsNullOrWhiteSpace(p)).Select(ls =>
+                    candidateQuery.PathStartsWithAny = libraries.SelectMany(l => l.Locations ?? Array.Empty<string>()).Where(p => !string.IsNullOrWhiteSpace(p)).Select(ls =>
                         ls.EndsWith(Path.DirectorySeparatorChar.ToString())
                             ? ls
                             : ls + Path.DirectorySeparatorChar).ToArray();
                 }
 
-                var itemsMediaInfo = _libraryManager.GetItemList(itemsMediaInfoQuery);
+                var candidates = _libraryManager.GetItemList(candidateQuery);
+                var itemsMediaInfo = candidates.Where(i => !i.GetMediaStreams().Any(s => s.Type == MediaStreamType.Audio)).ToList();
+                var imageCaptureRoots = enableImageCapture && librariesWithImageCapture.Any()
+                    ? librariesWithImageCapture.SelectMany(l => l.Locations).Where(p => !string.IsNullOrWhiteSpace(p)).ToArray()
+                    : Array.Empty<string>();
 
-                var itemsImageCaptureQuery = new InternalItemsQuery
+                bool IsInImageCaptureScope(BaseItem item) =>
+                    imageCaptureRoots.Any(root => PathBoundary.IsSameOrDescendant(item.Path, root));
+
+                if (enableImageCapture && imageCaptureRoots.Length > 0)
                 {
-                    HasPath = true,
-                    MediaTypes = new[] { MediaType.Video, MediaType.Audio }
-                };
-
-                if (enableImageCapture && librariesWithImageCapture.Any())
-                {
-                    itemsImageCaptureQuery.PathStartsWithAny =
-                        librariesWithImageCapture.SelectMany(l => l.Locations).Select(ls =>
-                            ls.EndsWith(Path.DirectorySeparatorChar.ToString())
-                                ? ls
-                                : ls + Path.DirectorySeparatorChar).ToArray();
-
-                    var itemsImageCapture = _libraryManager.GetItemList(itemsImageCaptureQuery)
-                        .Where(i => !i.HasImage(ImageType.Primary)).ToList();
+                    var itemsImageCapture = candidates
+                        .Where(i => IsInImageCaptureScope(i) && !i.HasImage(ImageType.Primary)).ToList();
                     items = itemsMediaInfo.Concat(itemsImageCapture).GroupBy(i => i.InternalId).Select(g => g.First())
                         .ToArray();
                 }
                 else
                 {
-                    items = itemsMediaInfo;
+                    items = itemsMediaInfo.ToArray();
                 }
 
                 if (includeExtra)
                 {
-                    itemsMediaInfoQuery.ExtraTypes = IncludeExtraTypes;
-                    var extrasMediaInfo = _libraryManager.GetItemList(itemsMediaInfoQuery);
+                    candidateQuery.ExtraTypes = IncludeExtraTypes;
+                    var extraCandidates = _libraryManager.GetItemList(candidateQuery);
+                    var extrasMediaInfo = extraCandidates
+                        .Where(i => !i.GetMediaStreams().Any(s => s.Type == MediaStreamType.Audio)).ToList();
 
-                    if (enableImageCapture && librariesWithImageCapture.Any())
+                    if (enableImageCapture && imageCaptureRoots.Length > 0)
                     {
-                        itemsImageCaptureQuery.ExtraTypes = IncludeExtraTypes;
-                        var extrasImageCapture = _libraryManager.GetItemList(itemsImageCaptureQuery);
+                        var extrasImageCapture = extraCandidates
+                            .Where(i => IsInImageCaptureScope(i) && !i.HasImage(ImageType.Primary)).ToList();
                         extras = extrasImageCapture.Concat(extrasMediaInfo).GroupBy(i => i.InternalId)
                             .Select(g => g.First()).ToArray();
                     }
                     else
                     {
-                        extras = extrasMediaInfo;
+                        extras = extrasMediaInfo.ToArray();
                     }
                 }
             }

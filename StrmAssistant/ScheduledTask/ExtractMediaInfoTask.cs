@@ -198,6 +198,7 @@ namespace StrmAssistant.ScheduledTask
             }
             finally
             {
+                LibraryApi.FlushForceReExtract();
                 // 取消路径（含 WaitAsync 抛出）必须复位，否则自动补漏会一直误判任务在跑
                 if (items.Count > 0) IsRunning = false;
             }
