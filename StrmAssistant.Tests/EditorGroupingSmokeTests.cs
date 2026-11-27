@@ -1,7 +1,9 @@
 using Emby.Web.GenericEdit;
 using Emby.Web.GenericEdit.Editors;
 using StrmAssistant.Options;
+using StrmAssistant.Properties;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -32,6 +34,9 @@ namespace StrmAssistant.Tests
             var concurrencyIndex = items.FindIndex(i => NameOrId(i, "TaskConcurrency"));
             var memoryIndex = items.FindIndex(i => NameOrId(i, "Memory"));
             var tasksIndex = items.FindIndex(i => NameOrId(i, "ScheduledTasks"));
+            var tasks = items.OfType<EditorGroup>().FirstOrDefault(g => NameOrId(g, "ScheduledTasks"));
+            Assert.NotNull(tasks);
+            Assert.Equal(Resources.ScheduledTasks_EditorTitle_Common_Tasks, tasks.DisplayName);
             var runtimeIndex = items.FindIndex(i => NameOrId(i, "RuntimeStatus"));
             var configIndex = items.FindIndex(i => NameOrId(i, "ConfigTransfer"));
             var aboutIndex = items.FindIndex(i => NameOrId(i, "AboutOptions"));
@@ -161,8 +166,12 @@ namespace StrmAssistant.Tests
             Assert.Contains(cache.EditorItems, i => NameOrId(i, "MetadataCacheMode"));
             Assert.DoesNotContain(cache.EditorItems, i => NameOrId(i, "EpisodeRefreshScope"));
 
+            var chinese = groups.First(g => NameOrId(g, "ChineseMetadata"));
+            Assert.Contains(chinese.EditorItems, i => NameOrId(i, "PinyinSortName"));
+
             var poster = groups.First(g => NameOrId(g, "PosterPerson"));
             var posterItems = poster.EditorItems.ToList();
+            Assert.DoesNotContain(posterItems, i => NameOrId(i, "PinyinSortName"));
             Assert.True(posterItems.FindIndex(i => NameOrId(i, "EnhanceMovieDbPerson")) <
                         posterItems.FindIndex(i => NameOrId(i, "ClearTagline")));
             Assert.True(posterItems.FindIndex(i => NameOrId(i, "ClearTagline")) <
@@ -277,6 +286,28 @@ namespace StrmAssistant.Tests
                         "CleanMemoryNowButton", "ScheduleIndexRebuildButton", "OptimizeSearchIndexButton",
                         "ClearMetadataCacheButton", "RestartServerButton" },
                 maintenanceButtons.Select(b => b.Name).ToArray());
+        }
+
+        [Fact]
+        public void PageDescriptions_OnlyApprovedPagesAreLocalized()
+        {
+            var descriptions = new Dictionary<EditableOptionsBase, string>
+            {
+                [new PluginOptions()] = "PluginOptions_EditorDescription_Basic_Settings",
+                [new MetadataEnhanceOptions()] = "MetadataEnhanceOptions_EditorDescription_Metadata_Enhance",
+                [new IntroSkipOptions()] = "IntroSkipOptions_EditorDescription_Intro_Credits_Detection",
+                [new NetworkProxyOptions()] = "NetworkProxyOptions_EditorDescription_Network_Direct_Link"
+            };
+
+            foreach (var pair in descriptions)
+            {
+                var expected = Resources.ResourceManager.GetString(pair.Value, CultureInfo.CurrentUICulture);
+                Assert.False(string.IsNullOrWhiteSpace(expected), $"{pair.Value} is missing");
+                Assert.Equal(expected, pair.Key.EditorDescription);
+            }
+
+            Assert.True(string.IsNullOrEmpty(new ExperienceEnhanceOptions().EditorDescription));
+            Assert.True(string.IsNullOrEmpty(new MediaInfoExtractOptions().EditorDescription));
         }
 
         private static bool NameOrId(EditorBase editor, string name)

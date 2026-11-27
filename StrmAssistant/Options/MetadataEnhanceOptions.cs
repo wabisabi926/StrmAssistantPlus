@@ -23,6 +23,8 @@ namespace StrmAssistant.Options
         [DisplayNameL("PluginOptions_MetadataEnhanceOptions_Metadata_Enhance", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_MetadataEnhanceOptions_Metadata_Enhance;
 
+        public override string EditorDescription => Resources.MetadataEnhanceOptions_EditorDescription_Metadata_Enhance;
+
         /// <summary>中文元数据：MovieDb / Tvdb 中文回退语言、非回退语言屏蔽等。</summary>
         [DisplayNameL("MetadataEnhanceOptions_Group_ChineseMetadata", typeof(Resources))]
         public ChineseMetadataOptions ChineseMetadata { get; set; } = new ChineseMetadataOptions();
@@ -50,7 +52,7 @@ namespace StrmAssistant.Options
         [DisplayNameL("MetadataEnhanceOptions_Group_DoubanAssist", typeof(Resources))]
         public DoubanAssistOptions DoubanAssist { get; set; } = new DoubanAssistOptions();
 
-        /// <summary>海报与排序：原语言海报、拼音排序名、NFO 增强导入、清除宣传语。</summary>
+        /// <summary>海报与人物：原语言海报、NFO 增强导入、清除宣传语与人物增强。</summary>
         [DisplayNameL("MetadataEnhanceOptions_Group_PosterSort", typeof(Resources))]
         public PosterSortOptions PosterSort { get; set; } = new PosterSortOptions();
 
@@ -167,6 +169,9 @@ namespace StrmAssistant.Options
                     "EnableMdbListCriticRating");
                 EditorGroupHelper.MoveItemBefore(editContainer, "CommunityRating",
                     "EnableMdbListCriticRating", "CommunityRatingMinVotes");
+
+                EditorGroupHelper.MoveItems(editContainer, "PosterPerson", "ChineseMetadata",
+                    nameof(PosterSortOptions.PinyinSortName));
 
                 // 豆瓣组内按 评分输出 → 刷新参数 → 元数据 → 连接 排序。
                 EditorGroupHelper.MoveItemBefore(editContainer, "DoubanAssist",

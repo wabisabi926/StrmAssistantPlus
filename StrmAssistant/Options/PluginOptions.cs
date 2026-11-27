@@ -19,7 +19,7 @@ namespace StrmAssistant.Options
         [DisplayNameL("PluginOptions_EditorTitle_Basic_Settings", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_EditorTitle_Basic_Settings;
 
-        public override string EditorDescription => string.Empty;
+        public override string EditorDescription => Resources.PluginOptions_EditorDescription_Basic_Settings;
 
         // 注意：这里刻意不设 Icon。标题是一整句话（36 字），带图标时在手机窄屏换行后
         // 图标会被容器裁掉一半；纯文字按钮会正常换行，桌面端也更清爽。

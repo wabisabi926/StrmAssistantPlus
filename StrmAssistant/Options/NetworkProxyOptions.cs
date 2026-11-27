@@ -16,6 +16,8 @@ namespace StrmAssistant.Options
         [DisplayNameL("NetworkProxyOptions_EditorTitle_Network_Direct_Link", typeof(Resources))]
         public override string EditorTitle => Resources.NetworkProxyOptions_EditorTitle_Network_Direct_Link;
 
+        public override string EditorDescription => Resources.NetworkProxyOptions_EditorDescription_Network_Direct_Link;
+
         /// <summary>网络：代理服务器、代理模式、刮削白名单、本地发现地址。</summary>
         [DisplayNameL("NetworkOptions_EditorTitle_Network", typeof(Resources))]
         public NetworkOptions Network { get; set; } = new NetworkOptions();

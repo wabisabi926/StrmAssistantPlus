@@ -71,6 +71,9 @@
   <data name="PluginOptions_IntroSkipOptions_Intro_Credits_Detection" xml:space="preserve">
     <value>片头片尾</value>
   </data>
+  <data name="IntroSkipOptions_EditorDescription_Intro_Credits_Detection" xml:space="preserve">
+    <value>播放探测、指纹与在线标记。</value>
+  </data>
   <data name="IntroSkipOptions_LibraryScope_Library_Scope" xml:space="preserve">
     <value>播放探测媒体库</value>
   </data>
@@ -274,6 +277,9 @@
   </data>
   <data name="PluginOptions_MetadataEnhanceOptions_Metadata_Enhance" xml:space="preserve">
     <value>元数据</value>
+  </data>
+  <data name="MetadataEnhanceOptions_EditorDescription_Metadata_Enhance" xml:space="preserve">
+    <value>刮削、评分、人物、剧集与缓存。</value>
   </data>
   <data name="MetadataEnhanceOptions_EnhanceNfoMetadata_Nfo_Metadata_Import_Enhanced" xml:space="preserve">
     <value>NFO 元数据导入增强</value>
@@ -492,7 +498,7 @@
     <value>季</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_AltMovieDb" xml:space="preserve">
-    <value>TMDB 接口设置</value>
+    <value>TMDB 接口</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ChineseMetadata" xml:space="preserve">
     <value>中文元数据</value>
@@ -1548,7 +1554,7 @@
     <value>播放时后台提取下一集媒体信息。默认关闭。</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>提取控制与性能</value>
+    <value>控制与性能</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>片头指纹检测</value>
@@ -1598,6 +1604,9 @@
   <data name="PluginOptions_EditorTitle_Basic_Settings" xml:space="preserve">
     <value>基础设置</value>
   </data>
+  <data name="PluginOptions_EditorDescription_Basic_Settings" xml:space="preserve">
+    <value>插件启停、任务与维护。</value>
+  </data>
   <data name="PluginOptions_EnablePlugin_Enable_Plugin" xml:space="preserve">
     <value>启用插件</value>
   </data>
@@ -1605,7 +1614,10 @@
     <value>关闭后插件不执行任何行为。修改后需重启服务器生效，默认开启。</value>
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
-    <value>网络与连接</value>
+    <value>网络与接口</value>
+  </data>
+  <data name="NetworkProxyOptions_EditorDescription_Network_Direct_Link" xml:space="preserve">
+    <value>代理、直链与 TMDB 接口。</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>清除季映射</value>
@@ -1686,7 +1698,7 @@
     <value>让支持版本选择的客户端（如 Kodi）在版本下拉显示画质、HDR 与音轨标签；仅多版本条目生效。默认关闭。</value>
   </data>
   <data name="ScheduledTasks_EditorTitle_Scheduled_Tasks" xml:space="preserve">
-    <value>任务快捷入口</value>
+    <value>常用任务</value>
   </data>
   <data name="ScheduledTasks_Started" xml:space="preserve">
     <value>已开始执行：{0}</value>

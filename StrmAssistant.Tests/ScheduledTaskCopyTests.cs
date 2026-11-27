@@ -22,7 +22,7 @@ namespace StrmAssistant.Tests
             { "RefreshPersonTask_Name_Refresh_Chinese_Actor", "Refresh People", "刷新人物信息", "重新整理人物資訊" },
             { "ScanExternalSubtitleTask_Name_Scan_External_Subtitles", "Scan External Subtitles & Audio", "扫描外挂字幕与音轨", "掃描外掛字幕與音軌" },
             { "ScrapeIntroDbTask_Name_Scrape_Intro_Credits_from_IntroDb", "Scrape Intro & Credits Markers", "刮削片头片尾标记", "刮削片頭片尾標記" },
-            { "MetadataEnhanceOptions_Group_AltMovieDb", "TMDB API Settings", "TMDB 接口设置", "TMDB 介面設定" },
+            { "MetadataEnhanceOptions_Group_AltMovieDb", "TMDB API", "TMDB 接口", "TMDB 介面" },
             { "MetadataEnhanceOptions_Group_CommunityRating", "Community Rating", "社区评分", "社群評分" },
             { "GeneralOptions_Group_ConfigTransfer", "Configuration Backup & Restore", "配置备份与恢复", "設定備份與還原" },
             { "DisclaimerDialog_EditorTitle_Disclaimer", "Disclaimer", "免责声明", "免責聲明" },
@@ -30,12 +30,16 @@ namespace StrmAssistant.Tests
             { "ItemDisplayOptions_EditorTitle_Item_Display", "UI Display", "界面显示", "介面顯示" },
             { "LibraryOrderOptions_EditorTitle_Library_and_Order", "Libraries & Sorting", "媒体库与排序", "媒體庫與排序" },
             { "ExperienceEnhanceOptions_Group_Playback", "Playback, Cleanup & Safety", "播放、清理与安全", "播放、清理與安全" },
-            { "MediaInfoExtractOptions_Group_ExtractionPerformance", "Extraction Control & Performance", "提取控制与性能", "擷取控制與效能" },
+            { "MediaInfoExtractOptions_Group_ExtractionPerformance", "Control & Performance", "控制与性能", "控制與效能" },
             { "IntroSkipOptions_Group_Playback", "Playback Detection", "播放探测", "播放偵測" },
-            { "NetworkProxyOptions_EditorTitle_Network_Direct_Link", "Network & Connections", "网络与连接", "網路與連線" },
-            { "ScheduledTasks_EditorTitle_Scheduled_Tasks", "Task Shortcuts", "任务快捷入口", "任務捷徑" },
+            { "NetworkProxyOptions_EditorTitle_Network_Direct_Link", "Network & API", "网络与接口", "網路與介面" },
+            { "ScheduledTasks_EditorTitle_Scheduled_Tasks", "Common Tasks", "常用任务", "常用任務" },
             { "MetadataEnhanceOptions_Group_ScrapeEpisodeGroup", "Episode Scraping & Grouping", "剧集刮削与分组", "劇集刮削與分組" },
             { "MetadataEnhanceOptions_Group_EpisodeRefresh", "Episode Metadata Refresh", "单集元数据刷新", "單集元資料重新整理" },
+            { "PluginOptions_EditorDescription_Basic_Settings", "Plugin status, tasks, and maintenance.", "插件启停、任务与维护。", "外掛啟停、任務與維護。" },
+            { "MetadataEnhanceOptions_EditorDescription_Metadata_Enhance", "Scraping, ratings, people, episodes, and cache.", "刮削、评分、人物、剧集与缓存。", "刮削、評分、人物、劇集與快取。" },
+            { "IntroSkipOptions_EditorDescription_Intro_Credits_Detection", "Playback detection, fingerprints, and online markers.", "播放探测、指纹与在线标记。", "播放偵測、指紋與線上標記。" },
+            { "NetworkProxyOptions_EditorDescription_Network_Direct_Link", "Proxy, direct links, and TMDB API.", "代理、直链与 TMDB 接口。", "代理、直連與 TMDB 介面。" },
         };
 
         [Theory]

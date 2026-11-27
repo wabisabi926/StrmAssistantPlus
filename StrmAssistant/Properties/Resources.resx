@@ -158,6 +158,9 @@
   <data name="PluginOptions_IntroSkipOptions_Intro_Credits_Detection" xml:space="preserve">
     <value>Intro &amp; Credits</value>
   </data>
+  <data name="IntroSkipOptions_EditorDescription_Intro_Credits_Detection" xml:space="preserve">
+    <value>Playback detection, fingerprints, and online markers.</value>
+  </data>
   <data name="IntroSkipOptions_LibraryScope_Library_Scope" xml:space="preserve">
     <value>Playback Detection Libraries</value>
   </data>
@@ -361,6 +364,9 @@
   </data>
   <data name="PluginOptions_MetadataEnhanceOptions_Metadata_Enhance" xml:space="preserve">
     <value>Metadata</value>
+  </data>
+  <data name="MetadataEnhanceOptions_EditorDescription_Metadata_Enhance" xml:space="preserve">
+    <value>Scraping, ratings, people, episodes, and cache.</value>
   </data>
   <data name="MetadataEnhanceOptions_EnhanceNfoMetadata_Nfo_Metadata_Import_Enhanced" xml:space="preserve">
     <value>Nfo Metadata Import Enhanced</value>
@@ -579,7 +585,7 @@
     <value>Season</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_AltMovieDb" xml:space="preserve">
-    <value>TMDB API Settings</value>
+    <value>TMDB API</value>
   </data>
   <data name="MetadataEnhanceOptions_Group_ChineseMetadata" xml:space="preserve">
     <value>Chinese Metadata</value>
@@ -1635,7 +1641,7 @@
     <value>Extract the next episode's media info in the background during playback. Default is OFF.</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>Extraction Control &amp; Performance</value>
+    <value>Control &amp; Performance</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>Fingerprint Detection</value>
@@ -1685,6 +1691,9 @@
   <data name="PluginOptions_EditorTitle_Basic_Settings" xml:space="preserve">
     <value>Basic Settings</value>
   </data>
+  <data name="PluginOptions_EditorDescription_Basic_Settings" xml:space="preserve">
+    <value>Plugin status, tasks, and maintenance.</value>
+  </data>
   <data name="PluginOptions_EnablePlugin_Enable_Plugin" xml:space="preserve">
     <value>Enable Plugin</value>
   </data>
@@ -1692,7 +1701,10 @@
     <value>Disables all plugin behavior. Requires a server restart to take effect. Default is ON.</value>
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
-    <value>Network &amp; Connections</value>
+    <value>Network &amp; API</value>
+  </data>
+  <data name="NetworkProxyOptions_EditorDescription_Network_Direct_Link" xml:space="preserve">
+    <value>Proxy, direct links, and TMDB API.</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>Clear Season Map</value>
@@ -1773,7 +1785,7 @@
     <value>Show quality, HDR and audio tags in the version selector on clients that support it (e.g. Kodi); multiple versions only. Default is OFF.</value>
   </data>
   <data name="ScheduledTasks_EditorTitle_Scheduled_Tasks" xml:space="preserve">
-    <value>Task Shortcuts</value>
+    <value>Common Tasks</value>
   </data>
   <data name="ScheduledTasks_Started" xml:space="preserve">
     <value>Started: {0}</value>

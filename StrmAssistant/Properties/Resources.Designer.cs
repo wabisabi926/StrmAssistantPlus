@@ -6030,5 +6030,41 @@ namespace StrmAssistant.Properties {
             }
         }
 
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string IntroSkipOptions_EditorDescription_Intro_Credits_Detection {
+            get {
+                return ResourceManager.GetString("IntroSkipOptions_EditorDescription_Intro_Credits_Detection", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string MetadataEnhanceOptions_EditorDescription_Metadata_Enhance {
+            get {
+                return ResourceManager.GetString("MetadataEnhanceOptions_EditorDescription_Metadata_Enhance", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string NetworkProxyOptions_EditorDescription_Network_Direct_Link {
+            get {
+                return ResourceManager.GetString("NetworkProxyOptions_EditorDescription_Network_Direct_Link", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string PluginOptions_EditorDescription_Basic_Settings {
+            get {
+                return ResourceManager.GetString("PluginOptions_EditorDescription_Basic_Settings", resourceCulture);
+            }
+        }
+
     }
 }

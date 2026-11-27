@@ -11,7 +11,7 @@ using System.Runtime.InteropServices;
 namespace StrmAssistant.Options
 {
     /// <summary>
-    /// 元数据增强 · 海报与排序分组：原语言海报、拼音排序名、NFO 增强导入、清除宣传语。
+    /// 元数据增强 · 海报与人物源组：原语言海报、NFO 增强导入、清除宣传语；拼音排序在 UI 上归入中文元数据。
     /// </summary>
     public class PosterSortOptions : EditableOptionsBase
     {

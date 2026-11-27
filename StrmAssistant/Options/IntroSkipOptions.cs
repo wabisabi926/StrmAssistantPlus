@@ -19,6 +19,8 @@ namespace StrmAssistant.Options
         [DisplayNameL("PluginOptions_IntroSkipOptions_Intro_Credits_Detection", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_IntroSkipOptions_Intro_Credits_Detection;
 
+        public override string EditorDescription => Resources.IntroSkipOptions_EditorDescription_Intro_Credits_Detection;
+
         /// <summary>声纹探测：解锁内置检测、指纹时长、并行计算、生效库范围与黑名单。</summary>
         [DisplayNameL("IntroSkipOptions_Group_Fingerprint", typeof(Resources))]
         public IntroSkipFingerprintOptions Fingerprint { get; set; } = new IntroSkipFingerprintOptions();
