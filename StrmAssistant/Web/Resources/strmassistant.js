@@ -128,11 +128,11 @@ define([
 
         let box = null;
         let keyword = '';
-        let originalDisplays = new WeakMap();
+        let originalDisplays = new Map();
 
         function isSettingsPage() {
             const hash = (location.hash || '').toLowerCase();
-            if (hash.indexOf('configurationpage') < 0) return false;
+            if (hash.indexOf('configurationpage') < 0 && hash.indexOf('genericui') < 0) return false;
             const text = (document.body && document.body.innerText || '').toLowerCase();
             return text.indexOf('strmassistant') >= 0 || text.indexOf('神医助手') >= 0 || text.indexOf('神醫助手') >= 0;
         }
@@ -168,7 +168,7 @@ define([
 
         function restoreDisplays() {
             for (const [el, display] of originalDisplays) el.style.display = display;
-            originalDisplays = new WeakMap();
+            originalDisplays = new Map();
         }
 
         function removeBox() {

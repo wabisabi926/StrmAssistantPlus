@@ -50,8 +50,10 @@ namespace StrmAssistant.Tests
         {
             var source = ReadSource("StrmAssistant/Web/Resources/strmassistant.js");
 
-            Assert.Contains("originalDisplays", source);
+            Assert.Contains("originalDisplays = new Map()", source);
+            Assert.DoesNotContain("originalDisplays = new WeakMap()", source);
             Assert.Contains("restoreDisplays", source);
+            Assert.Contains("hash.indexOf('genericui')", source);
             Assert.Contains("text.indexOf('strmassistant')", source);
             Assert.DoesNotContain("el.style.display = '';", source);
         }
