@@ -8,7 +8,7 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 747/747 通过；Release 构建 0 警告 0 错误。
+- 单测 775/775 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护；4.11 外挂字幕扫描与合集自动建库拦截恢复。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
@@ -21,6 +21,16 @@
 - 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复、合集自动建库拦截，以及本轮安全修复、普通刷新标记保护和真实片尾验收均已推送；`main` 指向 `e07b9ff`。未升版本、未打 tag、未发版。
 - 最终候选 DLL SHA-256 `344e1e5365de766565aad4293b02bdc72e739ad9a4ab076e004785e28a633f9f` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
+
+## ✅ TheIntroDB v4 mapping 集序转换已完成（2026-11-27）
+
+- 仅在 `tvdb_id` 路径传递 `mapping`；`Aired → official`、`Dvd → dvd`、`Absolute → absolute`。
+- 4.11 优先读取 `Series.SeriesOrder`（`fileorder` ProviderId，如 `Tvdb-2_dvd`），旧版本回退 `Series.DisplayOrder`。
+- 已有 `tvdb_episode_id` 精确锁定的单集不传 mapping；TMDB/IMDb 路径保持原行为。
+- 服务端返回 400 时去掉 mapping 重试一次，仍失败则按原失败分类处理。
+- 新增 29 项 mapping 测试，全量 **775/775** 通过；最终候选 DLL SHA-256 `a6694f756c5390750647b9f6e90ea9c846a35ca6e9bc22a9f1167d0f62fc2102`。
+- 隔离 4.11 库内容级对照通过：《三国演义》absolute 与 official 均写入 03:00；《笑傲江湖》DVD 返回 400 并回退 official，均写入 01:30。mapping 轮 6 次请求、无 mapping 基线 4 次请求，两轮 8 条 `#DB` 标记摘要完全一致。
+- 4.10 候选启动 `Healthy`，验证旧 `DisplayOrder` 回退路径；验收后两套实例已恢复 `344e1e53…` 原 DLL 与原配置。未找到源站 official/dvd/absolute 返回不同内容的真实样本，因此“集序差异改变标记内容”仍未证实。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
 
@@ -72,23 +82,7 @@ CHANGELOG / README 已按最终行为更新；**不要移动或重打该 tag**�
 
 ## 待办
 
-### 1. TheIntroDB `mapping` 集序转换（暂缓）
-
-**结论（2026-11-17）**：暂不实现。本机 371/371 部剧的 `DisplayOrder` 均为 `Aired`；多数单集已有 TVDB 单集 id（有 id 时服务端直接精确 pin，不需要 mapping）；且 mapping 只作用于 TheIntroDB 源的 `tvdb_id` 路径，而 NAS 上 TheIntroDB 不可达。当前库无样本、无收益。
-
-**恢复条件**：库里出现 DVD/绝对序的剧，且该集没有 TVDB 单集 id、TheIntroDB 可达时再补。
-
-**背景**：TheIntroDB v4 支持 `mapping=default|official|dvd|alternate|absolute|regional`，用于把调用方的季集号换算成 TVDB default 序。当前只按 Emby 里存的季集号查询，DVD/绝对序的剧集可能取到别的集的数据。
-
-**实现要点**：
-- 仅在走 `tvdb_id` 定位时传 `mapping`；`tmdb_id` / `imdb_id` 路径不传
-- `Series.DisplayOrder` 映射：`Aired → official`、`Dvd → dvd`、`Absolute → absolute`
-- 服务端对不支持的序会返回 400，需回退为不带 `mapping` 重试一次
-- 单集已有 `tvdb_episode_id` 时本身已精确 pin，可不传 `mapping`
-
-**验收标准**：找一部 DVD 或绝对序的剧（可临时改 `DisplayOrder` 并刷新元数据），对比加/不加 `mapping` 时同一集取到的片头时间是否对应同一集；日志确认无 400。
-
-### 2. 修复 `test-linux` CI 构建（阻塞 4.0.1.0 发版）
+### 1. 修复 `test-linux` CI 构建（阻塞 4.0.1.0 发版）
 
 **背景**：2026-11-17 给 `test.yml` 加了 ubuntu-latest job（与 Windows 跑同一套 509 项单测），
 构建插件步骤失败（约 8 秒即退出，exit 1）。
@@ -126,7 +120,7 @@ Build FAILED. (2 Error(s))
 **✅ CI 复验通过（run `43998522801`）**：`test` 与 `test-linux` 两 job 均 success；
 Linux job `Build succeeded` + ILRepack 跑到 + 509/509 passed。本待办完成。
 
-### 3. NAS 真盘验证（发版门槛）— ✅ 已完成（2026-11-17，合成 300 段盘，本地 ISO + 远程 strm 双路径）
+### 2. NAS 真盘验证（发版门槛）— ✅ 已完成（2026-11-17，合成 300 段盘，本地 ISO + 远程 strm 双路径）
 
 **环境**：内网 NAS 的 Emby 4.10.2.0（Linux）。本机无 Docker、WSL 被禁，故用本仓自建的
 300 段无缝分支合成 ISO（119,197,696 B，600s，2 路视频 4K+1080p + TrueHD）代替真实盘——
@@ -155,7 +149,7 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 无 mismatch，落库 mpegts/600s/2 路 hevc。测试用临时库/文件已清理，**ISO 测试库与文件保留在 NAS**
 （`strmassistant-iso-test`），便于复测；验证用 API Key 不入库。
 
-### 4. ISO 采样精度与弱网（P1）
+### 3. ISO 采样精度与弱网（P1）
 
 - ~~单流码率改按样本内各 PID 字节占比分配~~ ✅ 已完成（`TsByteAccounting`）：ffprobe 对 mpegts 的
   视频流一律给 `bit_rate=N/A`，Emby 只能把容器码率**等分**给各路视频，带画中画的原盘会把 PiP
@@ -168,7 +162,7 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
   两端最终 `47.28 / 3.58`，见文首完成记录。
 - 远程采样预算自适应（弱网降到 32MB/128 段），需真机弱网验证。
 
-### 5. STRM 原生片头/片尾内容验收（部分完成）
+### 4. STRM 原生片头/片尾内容验收（部分完成）
 
 - 本机 4.11 使用《武林外传》S01E01/E02 两个真实 STRM：片头任务完成，两集均生成音频指纹并识别出同一段约 97.3 秒片头，置信度 0.9。
 - 片尾任务已补齐 `CreditsScheduledTask` 查询范围与 `MarkerDetector.IsCreditsDetectionEnabled` 的 STRM 放行；启用时仍遵守媒体库的片尾检测开关。
@@ -176,11 +170,11 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 - 合成样本为 60 分钟视频，最后 8 分钟含黑底高亮与字幕变化，用于满足原生黑帧、上下文和稳定性阈值；该证据验证 STRM 链路，不替代真实影片内容验收。
 - 真实 NAS 源片尾内容仍待家庭局域网恢复后复验；本轮不访问 NAS。
 
-### 6. 真实多 m2ts 本地 ISO
+### 5. 真实多 m2ts 本地 ISO
 
 使用真实多 m2ts 本地 ISO 验证正片选择、流数量、码率、章节和语言；现有证据为单标题与 300 段合成盘，不能替代真实多 m2ts 样本。
 
-### 7. 4.11 外挂字幕稳定入口 — ✅ 已完成（2026-11-27）
+### 6. 4.11 外挂字幕稳定入口 — ✅ 已完成（2026-11-27）
 
 - `SubtitleResolver` 旧方法名已移除，改为按 `BaseTrackResolver(BaseItem,int,IDirectoryService,LibraryOptions,NamingOptions,bool) -> List<MediaStream>` 稳定签名解析。
 - 外挂字幕探测更新器按 `IMediaProbeManager` 构造参数和 `(BaseItem,MediaStream,MetadataRefreshOptions,LibraryOptions,CancellationToken) -> Task<bool>` 唯一签名解析；4.11 使用 Reflection，不再对混淆方法名做 Harmony 逆向补丁。
@@ -189,7 +183,7 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 - 补充特殊格式验收：新增 `.smi` 后探测为 `Codec=sami`、语言 `zh`，无 `No result when probing external track` 警告；清空 `MediaStreams2` 后运行恢复任务，JSON 恢复 `.smi` 并自动补入新增 `.srt`，字幕与运行时错误均为 0。
 - 全量 718/718 通过，Release 构建 0 警告 0 错误；最终 DLL SHA-256 `1f3ec19997cd4bf54c5508519662536a691cb4f47967fbdf4663958538cd8639`。
 
-### 8. 4.11 阻止合集库自动创建 — ✅ 已完成（2026-11-27）
+### 7. 4.11 阻止合集库自动创建 — ✅ 已完成（2026-11-27）
 
 - 4.11 的 `ICollectionManager` 实现保留一个私有无参 `void` 自动建库方法，内部读取 `BoxSets` 默认库选项并调用 `AddVirtualFolder`。
 - 插件从接口实现取具体类型，只允许该签名唯一命中时打 Harmony prefix；歧义或缺失时不拦截，用户视图过滤继续生效。
@@ -197,9 +191,9 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 - 主 4.11.0.19 与 4.10.2.0 实测均为 `NoBoxsetsAutoCreation=Applied`、启动 `Healthy`；隔离 4.11 实际创建合集后 BoxSets 虚拟库数量保持 0；全量 718/718 通过，Release 构建 0 警告 0 错误。
 - 最终 DLL SHA-256 `1f3ec19997cd4bf54c5508519662536a691cb4f47967fbdf4663958538cd8639`。
 
-### 9. 4.9 / ARM64 回归（仅用户需要时）
+### 8. ARM64 NAS 回归（发版前）
 
-具备对应设备后再跑同一套启动健康、中文搜索、ISO、截图、章节、多版本和通知冒烟；未验收前不承诺完整功能一致。
+4.9 不再作为适配目标，仅保留历史兼容路径。ARM64 在 NAS 部署后按启动健康、Reflection 回退、中文搜索、ISO、截图、章节、多版本和通知清单验收；未验收前不承诺完整功能一致。
 
 ## 观察项（4.0.0.9 上线后）
 

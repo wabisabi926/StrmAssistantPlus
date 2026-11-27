@@ -210,7 +210,7 @@ namespace StrmAssistant.Common
         /// </summary>
         public async Task<IntroDbMedia> GetMediaInfoAsync(string tmdbId, int? season, int? episode,
             CancellationToken cancellationToken, string imdbId = null, long? durationMs = null,
-            string tvdbId = null, string tvdbEpisodeId = null)
+            string tvdbId = null, string tvdbEpisodeId = null, string mapping = null)
         {
             var providers = OrderProviders(
                 ParseUnifiedProviders(Plugin.Instance.IntroSkipStore.GetOptions().Scrape.UnifiedIntroDbProviders),
@@ -228,7 +228,7 @@ namespace StrmAssistant.Common
                 }
 
                 var data = await QueryProviderAsync(provider, tmdbId, tvdbId, tvdbEpisodeId, imdbId, durationMs,
-                    season, episode, cancellationToken).ConfigureAwait(false);
+                    season, episode, cancellationToken, mapping).ConfigureAwait(false);
 
                 if (data == null) continue;
 
@@ -331,6 +331,58 @@ namespace StrmAssistant.Common
             return list;
         }
 
+        internal static string NormalizeTheIntroDbMapping(string mapping)
+        {
+            var value = (mapping ?? string.Empty).Trim().ToLowerInvariant();
+            return value is "default" or "official" or "dvd" or "alternate" or "absolute" or "regional"
+                ? value
+                : null;
+        }
+
+        internal static string GetTheIntroDbMapping(string displayOrder)
+        {
+            return (displayOrder ?? string.Empty).Trim().ToLowerInvariant() switch
+            {
+                "aired" or "official" => "official",
+                "dvd" => "dvd",
+                "absolute" => "absolute",
+                _ => null
+            };
+        }
+
+        internal static string GetTheIntroDbMapping(Series series)
+        {
+            if (series == null) return null;
+
+            var seriesOrderProperty = series.GetType().GetProperty("SeriesOrder");
+            var seriesOrder = seriesOrderProperty?.GetValue(series) as string;
+            if (!string.IsNullOrWhiteSpace(seriesOrder))
+            {
+                return GetTheIntroDbMappingFromSeriesOrder(seriesOrder);
+            }
+
+            return GetTheIntroDbMapping(series.DisplayOrder.ToString());
+        }
+
+        internal static string GetTheIntroDbMappingFromSeriesOrder(string seriesOrder)
+        {
+            var value = (seriesOrder ?? string.Empty).Trim();
+            if (value.Length == 0) return null;
+
+            var separator = value.IndexOf('_');
+            if (separator >= 0)
+            {
+                value = value.Substring(separator + 1);
+            }
+            else
+            {
+                separator = value.IndexOf('-');
+                if (separator >= 0) value = value.Substring(separator + 1);
+            }
+
+            return GetTheIntroDbMapping(value);
+        }
+
         /// <summary>
         /// 构造 TheIntroDB v4 的 /media 请求。
         /// v4 要求必须提供媒体 id（tmdb_id/tvdb_id/imdb_id 三选一）且 TV 必须带 season+episode；
@@ -339,7 +391,7 @@ namespace StrmAssistant.Common
         /// v4 不再接受 type 参数：无 season/episode 即电影。
         /// </summary>
         internal static string BuildTheIntroDbUrl(string tmdbId, string tvdbId, string tvdbEpisodeId, string imdbId,
-            int? season, int? episode, long? durationMs)
+            int? season, int? episode, long? durationMs, string mapping = null)
         {
             var isEpisode = season.HasValue && episode.HasValue;
 
@@ -372,6 +424,15 @@ namespace StrmAssistant.Common
                 {
                     url += "&tvdb_episode_id=" + Uri.EscapeDataString(tvdbEpisodeId.Trim());
                 }
+
+                var normalizedMapping = NormalizeTheIntroDbMapping(mapping);
+                if (string.IsNullOrWhiteSpace(tmdbId) &&
+                    !string.IsNullOrWhiteSpace(tvdbId) &&
+                    string.IsNullOrWhiteSpace(tvdbEpisodeId) &&
+                    normalizedMapping != null)
+                {
+                    url += "&mapping=" + normalizedMapping;
+                }
             }
 
             if (durationMs.HasValue && durationMs.Value > 0)
@@ -384,10 +445,11 @@ namespace StrmAssistant.Common
 
         private async Task<SourceResult> QueryProviderAsync(string provider, string tmdbId, string tvdbId,
             string tvdbEpisodeId, string imdbId, long? durationMs, int? season, int? episode,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken, string mapping = null)
         {
             string url;
             string apiKey;
+            string mappingFallbackUrl = null;
             TimeSpan interval;
 
             if (provider == "IntroDb")
@@ -407,9 +469,13 @@ namespace StrmAssistant.Common
             else
             {
                 apiKey = Plugin.Instance.IntroSkipStore.GetOptions().Scrape.TidbApiKey;
-                url = BuildTheIntroDbUrl(tmdbId, tvdbId, tvdbEpisodeId, imdbId, season, episode, durationMs);
+                url = BuildTheIntroDbUrl(tmdbId, tvdbId, tvdbEpisodeId, imdbId, season, episode, durationMs, mapping);
 
                 if (url == null) return null;
+
+                var urlWithoutMapping = BuildTheIntroDbUrl(tmdbId, tvdbId, tvdbEpisodeId, imdbId,
+                    season, episode, durationMs);
+                if (urlWithoutMapping != url) mappingFallbackUrl = urlWithoutMapping;
 
                 interval = string.IsNullOrWhiteSpace(apiKey)
                     ? TheIntroDbRequestIntervalAnonymous
@@ -421,29 +487,24 @@ namespace StrmAssistant.Common
                 return cached.Data;
             }
 
-            await ThrottleAsync(interval).ConfigureAwait(false);
-
-            _requestCounts.AddOrUpdate(provider, 1, (_, c) => c + 1);
-
             try
             {
-                using var request = new HttpRequestMessage(HttpMethod.Get, url);
-                request.Headers.TryAddWithoutValidation("Accept", "application/json");
-
                 var userAgent = Plugin.Instance.UserAgent;
-                if (!string.IsNullOrWhiteSpace(userAgent))
-                {
-                    request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
-                }
-
-                if (!string.IsNullOrWhiteSpace(apiKey))
-                {
-                    request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey.Trim());
-                }
-
-                using var response = await IntroDbHttpClient
-                    .SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken)
+                var sendResult = await SendTheIntroDbWithMappingFallbackAsync(async request =>
+                    {
+                        await ThrottleAsync(interval).ConfigureAwait(false);
+                        _requestCounts.AddOrUpdate(provider, 1, (_, c) => c + 1);
+                        return await IntroDbHttpClient
+                            .SendAsync(request, HttpCompletionOption.ResponseContentRead, cancellationToken)
+                            .ConfigureAwait(false);
+                    }, url, mappingFallbackUrl, apiKey, userAgent, cancellationToken)
                     .ConfigureAwait(false);
+
+                using var response = sendResult.Response;
+                if (sendResult.UsedFallback)
+                {
+                    _logger.Info("IntroDbScrape - TheIntroDB mapping rejected; retried without mapping for {0}", url);
+                }
 
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
@@ -464,8 +525,10 @@ namespace StrmAssistant.Common
                 {
                     RecordSourceFailure(provider);
                     RecordRequestFailure("status " + (int)response.StatusCode);
-                    _logger.Debug("IntroDbScrape - {0} unexpected status {1} for {2}", provider,
-                        (int)response.StatusCode, url);
+                    var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+                    if (responseBody.Length > 500) responseBody = responseBody.Substring(0, 500);
+                    _logger.Warn("IntroDbScrape - {0} unexpected status {1} for {2}: {3}", provider,
+                        (int)response.StatusCode, url, responseBody);
                     return null;
                 }
 
@@ -501,6 +564,39 @@ namespace StrmAssistant.Common
                 RecordAndLogFailure(provider, url, ClassifyRequestFailure(e), e);
                 return null;
             }
+        }
+
+        internal static async Task<(HttpResponseMessage Response, bool UsedFallback)>
+            SendTheIntroDbWithMappingFallbackAsync(
+                Func<HttpRequestMessage, Task<HttpResponseMessage>> sendAsync,
+                string url, string fallbackUrl, string apiKey, string userAgent,
+                CancellationToken cancellationToken)
+        {
+            using var request = CreateTheIntroDbRequest(url, apiKey, userAgent);
+            var response = await sendAsync(request).ConfigureAwait(false);
+            if (response.StatusCode != HttpStatusCode.BadRequest || string.IsNullOrEmpty(fallbackUrl))
+            {
+                return (response, false);
+            }
+
+            response.Dispose();
+            using var retryRequest = CreateTheIntroDbRequest(fallbackUrl, apiKey, userAgent);
+            return (await sendAsync(retryRequest).ConfigureAwait(false), true);
+        }
+
+        private static HttpRequestMessage CreateTheIntroDbRequest(string url, string apiKey, string userAgent)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("Accept", "application/json");
+            if (!string.IsNullOrWhiteSpace(userAgent))
+            {
+                request.Headers.TryAddWithoutValidation("User-Agent", userAgent);
+            }
+            if (!string.IsNullOrWhiteSpace(apiKey))
+            {
+                request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + apiKey.Trim());
+            }
+            return request;
         }
 
         /// <summary>两个源的响应结构不同，分别反序列化后再归一。</summary>
@@ -782,6 +878,9 @@ namespace StrmAssistant.Common
                 var tmdbId = series.GetProviderId(MetadataProviders.Tmdb);
                 var tvdbId = series.GetProviderId(MetadataProviders.Tvdb);
                 var imdbId = series.GetProviderId(MetadataProviders.Imdb);
+                var mapping = GetTheIntroDbMapping(series);
+                _logger.Info("IntroDbScrape - TheIntroDB mapping for {0}: {1}", series.Name,
+                    string.IsNullOrWhiteSpace(mapping) ? "default" : mapping);
 
                 // 三种 id 都没有才放弃；只有 TMDB 不再作为硬门槛。
                 if (string.IsNullOrEmpty(tmdbId) && string.IsNullOrEmpty(tvdbId) && string.IsNullOrEmpty(imdbId))
@@ -824,7 +923,8 @@ namespace StrmAssistant.Common
                             imdbId: imdbId,
                             durationMs: episode.RunTimeTicks > 0 ? episode.RunTimeTicks / 10000 : null,
                             tvdbId: tvdbId,
-                            tvdbEpisodeId: episode.GetProviderId(MetadataProviders.Tvdb))
+                            tvdbEpisodeId: episode.GetProviderId(MetadataProviders.Tvdb),
+                            mapping: mapping)
                         .ConfigureAwait(false);
 
                     if (data == null)

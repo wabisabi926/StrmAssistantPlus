@@ -1,7 +1,13 @@
+using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Model.Entities;
 using StrmAssistant.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -222,6 +228,157 @@ namespace StrmAssistant.Tests
             var url = IntroDbApi.BuildTheIntroDbUrl("603", null, null, null, null, null, 0);
 
             Assert.DoesNotContain("duration_ms", url);
+        }
+
+        [Theory]
+        [InlineData("default")]
+        [InlineData("official")]
+        [InlineData("dvd")]
+        [InlineData("alternate")]
+        [InlineData("absolute")]
+        [InlineData("regional")]
+        public void NormalizeTheIntroDbMapping_AcceptsSupportedValues(string mapping)
+        {
+            Assert.Equal(mapping, IntroDbApi.NormalizeTheIntroDbMapping(" " + mapping.ToUpperInvariant() + " "));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData("unknown")]
+        public void NormalizeTheIntroDbMapping_RejectsUnsupportedValues(string mapping)
+        {
+            Assert.Null(IntroDbApi.NormalizeTheIntroDbMapping(mapping));
+        }
+
+        [Theory]
+        [InlineData("Aired", "official")]
+        [InlineData("Dvd", "dvd")]
+        [InlineData("Absolute", "absolute")]
+        [InlineData("Unknown", null)]
+        public void GetTheIntroDbMapping_MapsDisplayOrder(string displayOrder, string expected)
+        {
+            Assert.Equal(expected, IntroDbApi.GetTheIntroDbMapping(displayOrder));
+        }
+
+        [Theory]
+        [InlineData(null, null)]
+        [InlineData("", null)]
+        [InlineData("Tvdb-1_aired", "official")]
+        [InlineData("Tvdb-1_official", "official")]
+        [InlineData("tvdb-2_dvd", "dvd")]
+        [InlineData("Tvdb-3_absolute", "absolute")]
+        [InlineData("dvd", "dvd")]
+        [InlineData("Tvdb-custom", null)]
+        public void GetTheIntroDbMappingFromSeriesOrder_MapsEmby411Order(string seriesOrder, string expected)
+        {
+            Assert.Equal(expected, IntroDbApi.GetTheIntroDbMappingFromSeriesOrder(seriesOrder));
+        }
+
+        [Fact]
+        public void GetTheIntroDbMapping_FallsBackToDisplayOrderWhenSeriesOrderIsUnavailable()
+        {
+            var series = new Series { DisplayOrder = SeriesDisplayOrder.Dvd };
+
+            Assert.Equal("dvd", IntroDbApi.GetTheIntroDbMapping(series));
+        }
+
+        [Fact]
+        public void BuildTheIntroDbUrl_AddsMappingOnlyForTvdbEpisodeWithoutEpisodePin()
+        {
+            var url = IntroDbApi.BuildTheIntroDbUrl(null, "121361", null, "tt0944947", 1, 2, null, "dvd");
+
+            Assert.Equal(
+                "https://api.theintrodb.org/v4/media?tvdb_id=121361&season=1&episode=2&mapping=dvd",
+                url);
+        }
+
+        [Fact]
+        public void BuildTheIntroDbUrl_OmitsMappingForTmdbAndImdbPaths()
+        {
+            var tmdb = IntroDbApi.BuildTheIntroDbUrl("1399", "121361", null, "tt0944947", 1, 2, null, "dvd");
+            var imdb = IntroDbApi.BuildTheIntroDbUrl(null, null, null, "tt0944947", 1, 2, null, "dvd");
+
+            Assert.DoesNotContain("mapping=", tmdb);
+            Assert.DoesNotContain("mapping=", imdb);
+        }
+
+        [Fact]
+        public void BuildTheIntroDbUrl_OmitsMappingWhenEpisodeIsPinnedOrMovie()
+        {
+            var pinned = IntroDbApi.BuildTheIntroDbUrl(null, "121361", "5577121", null, 1, 2, null, "dvd");
+            var movie = IntroDbApi.BuildTheIntroDbUrl(null, "121361", null, null, null, null, null, "dvd");
+
+            Assert.DoesNotContain("mapping=", pinned);
+            Assert.DoesNotContain("mapping=", movie);
+        }
+
+        [Fact]
+        public async Task SendTheIntroDbWithMappingFallback_RetriesOnceWithoutMappingOn400()
+        {
+            var statuses = new Queue<HttpStatusCode>(new[] { HttpStatusCode.BadRequest, HttpStatusCode.OK });
+            var urls = new List<string>();
+            Task<HttpResponseMessage> Send(HttpRequestMessage request)
+            {
+                urls.Add(request.RequestUri.AbsoluteUri);
+                return Task.FromResult(new HttpResponseMessage(statuses.Dequeue()));
+            }
+
+            var result = await IntroDbApi.SendTheIntroDbWithMappingFallbackAsync(Send,
+                "https://api.theintrodb.org/v4/media?tvdb_id=1&mapping=dvd",
+                "https://api.theintrodb.org/v4/media?tvdb_id=1", null, null, CancellationToken.None);
+            using (result.Response)
+            {
+                Assert.True(result.UsedFallback);
+                Assert.Equal(HttpStatusCode.OK, result.Response.StatusCode);
+                Assert.Equal(2, urls.Count);
+                Assert.Contains("mapping=dvd", urls[0]);
+                Assert.DoesNotContain("mapping=", urls[1]);
+            }
+        }
+
+        [Fact]
+        public async Task SendTheIntroDbWithMappingFallback_DoesNotRetryWithoutFallbackUrl()
+        {
+            var statuses = new Queue<HttpStatusCode>(new[] { HttpStatusCode.BadRequest });
+            var calls = 0;
+            Task<HttpResponseMessage> Send(HttpRequestMessage request)
+            {
+                calls++;
+                return Task.FromResult(new HttpResponseMessage(statuses.Dequeue()));
+            }
+
+            var result = await IntroDbApi.SendTheIntroDbWithMappingFallbackAsync(Send,
+                "https://api.theintrodb.org/v4/media?tvdb_id=1&mapping=dvd", null, null, null,
+                CancellationToken.None);
+            using (result.Response)
+            {
+                Assert.False(result.UsedFallback);
+                Assert.Equal(1, calls);
+                Assert.Equal(HttpStatusCode.BadRequest, result.Response.StatusCode);
+            }
+        }
+
+        [Fact]
+        public async Task SendTheIntroDbWithMappingFallback_StopsAfterSecond400()
+        {
+            var statuses = new Queue<HttpStatusCode>(new[] { HttpStatusCode.BadRequest, HttpStatusCode.BadRequest });
+            var calls = 0;
+            Task<HttpResponseMessage> Send(HttpRequestMessage request)
+            {
+                calls++;
+                return Task.FromResult(new HttpResponseMessage(statuses.Dequeue()));
+            }
+
+            var result = await IntroDbApi.SendTheIntroDbWithMappingFallbackAsync(Send,
+                "https://api.theintrodb.org/v4/media?tvdb_id=1&mapping=dvd",
+                "https://api.theintrodb.org/v4/media?tvdb_id=1", null, null, CancellationToken.None);
+            using (result.Response)
+            {
+                Assert.True(result.UsedFallback);
+                Assert.Equal(2, calls);
+                Assert.Equal(HttpStatusCode.BadRequest, result.Response.StatusCode);
+            }
         }
 
         [Fact]
