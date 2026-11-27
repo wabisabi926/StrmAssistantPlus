@@ -1017,8 +1017,8 @@ namespace StrmAssistant
                     }
                     else if (options.ChineseSearch.EnhanceChineseSearchRestore)
                     {
-                        options.ChineseSearch.EnhanceChineseSearchRestore = false;
-                        changed = true;
+                        Logger.Info($"EnhanceChineseSearch: {reason}; index restore remains queued.");
+                        return;
                     }
 
                     if (!changed)
