@@ -67,6 +67,38 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void IsLocalFileInScope_AcceptsFileInsideRoot()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "media", "Movie");
+            var child = Path.Combine(root, "movie.mkv");
+
+            Assert.True(PathBoundary.IsLocalFileInScope(child, new[] { root }));
+        }
+
+        [Fact]
+        public void IsLocalFileInScope_RejectsSiblingAndRemoteUri()
+        {
+            var root = Path.Combine(Path.GetTempPath(), "media", "Movie");
+            var sibling = Path.Combine(Path.GetTempPath(), "media", "Movie2", "movie.mkv");
+
+            Assert.False(PathBoundary.IsLocalFileInScope(sibling, new[] { root }));
+            Assert.False(PathBoundary.IsLocalFileInScope("https://example.com/movie.mkv", new[] { root }));
+        }
+
+        [Fact]
+        public void IsLocalFileInScope_HandlesUncRootOnWindows()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+
+            const string root = @"\\server\share\Movie";
+            const string child = @"\\server\share\Movie\movie.mkv";
+            const string sibling = @"\\server\share\Movie2\movie.mkv";
+
+            Assert.True(PathBoundary.IsLocalFileInScope(child, new[] { root }));
+            Assert.False(PathBoundary.IsLocalFileInScope(sibling, new[] { root }));
+        }
+
+        [Fact]
         public void IsSameOrDescendant_HandlesUncRootOnWindows()
         {
             if (!OperatingSystem.IsWindows()) return;

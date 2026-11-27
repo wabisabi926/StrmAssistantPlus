@@ -71,65 +71,57 @@ namespace StrmAssistant.Web.Service
             if (DryRunMode.Skip($"delete {deleteItems.Count} version item(s)", _logger)) return;
 
             var allMountPaths = new Dictionary<string, bool?>();
+            var deleteFiles = new List<string>();
+            var metadataDirectories = new List<string>();
 
             foreach (var deleteItem in deleteItems)
             {
-                var mountPaths = enableDeepDelete || enableNotification
-                    ? Plugin.LibraryApi.PrepareDeepDelete(deleteItem)
-                    : null;
-                
-                var proceedToDelete = true;
-                var deletePaths = Plugin.LibraryApi.GetDeletePaths(deleteItem);
-
-                foreach (var path in deletePaths)
+                foreach (var path in Plugin.LibraryApi.GetDeletePaths(deleteItem).Where(p => !p.IsDirectory))
                 {
-                    try
-                    {
-                        if (!path.IsDirectory)
-                        {
-                            _logger.Info("DeleteVersion - Attempting to delete file: " + path.FullName);
-                            _fileSystem.DeleteFile(path.FullName, true);
-                        }
-                    }
-                    catch (Exception e)
-                    {
-                        if (e is IOException || e is UnauthorizedAccessException)
-                        {
-                            proceedToDelete = false;
-                            _logger.Error("DeleteVersion - Failed to delete file: " + path.FullName);
-                            _logger.Error(e.Message);
-                            _logger.Debug(e.StackTrace);
-                        }
-                    }
+                    deleteFiles.Add(path.FullName);
                 }
 
-                if (proceedToDelete)
+                var metadataPath = deleteItem.GetInternalMetadataPath();
+                if (!string.IsNullOrEmpty(metadataPath) && _fileSystem.DirectoryExists(metadataPath))
                 {
-                    _itemRepository.DeleteItems(new[] { deleteItem });
-
-                    try
-                    {
-                        _fileSystem.DeleteDirectory(deleteItem.GetInternalMetadataPath(), true, true);
-                    }
-                    catch
-                    {
-                        // ignored
-                    }
+                    metadataDirectories.Add(metadataPath);
                 }
 
-                if (proceedToDelete && mountPaths != null)
+                if (enableDeepDelete || enableNotification)
                 {
-                    allMountPaths = allMountPaths
-                        .Concat(mountPaths)
-                        .ToDictionary(kv => kv.Key, kv => kv.Value);;
+                    var mountPaths = Plugin.LibraryApi.PrepareDeepDelete(deleteItem, GetDeepDeleteScope(deleteItem));
+                    foreach (var pair in mountPaths)
+                    {
+                        allMountPaths.TryAdd(pair.Key, pair.Value);
+                    }
                 }
             }
 
-            var localMountPaths = new HashSet<string>(allMountPaths.Where(kv => kv.Value is true).Select(kv => kv.Key));
-
-            if (enableDeepDelete && localMountPaths.Count > 0)
+            if (enableDeepDelete)
             {
-                _ = BackgroundTaskRunner.Run("DeepDelete.Execute", () => Plugin.LibraryApi.ExecuteDeepDelete(localMountPaths));
+                foreach (var mountPath in allMountPaths.Where(p => p.Value is true).Select(p => p.Key))
+                {
+                    foreach (var path in Plugin.LibraryApi.GetDeletePaths(mountPath).Where(p => !p.IsDirectory))
+                    {
+                        deleteFiles.Add(path.FullName);
+                    }
+                }
+            }
+
+            var transaction = VersionDeleteTransaction.Execute(deleteFiles, metadataDirectories,
+                _fileSystem.MoveFile, _fileSystem.MoveDirectory,
+                () => _itemRepository.DeleteItems(deleteItems.ToArray()),
+                path => _fileSystem.DeleteDirectory(path, true));
+            if (!transaction.Committed)
+            {
+                _logger.Error("DeleteVersion - transaction rolled back: " + transaction.Error);
+                return;
+            }
+
+            if (transaction.RetainedStagingPaths.Count > 0)
+            {
+                _logger.Warn("DeleteVersion - committed with retained staging directories: " +
+                             string.Join(" | ", transaction.RetainedStagingPaths));
             }
 
             if (enableNotification && allMountPaths.Count > 0 && user != null)
@@ -137,6 +129,19 @@ namespace StrmAssistant.Web.Service
                 _ = BackgroundTaskRunner.Run("DeepDelete.Notify", () => Plugin.NotificationApi.DeepDeleteSendNotification(item, user,
                     new HashSet<string>(allMountPaths.Keys)));
             }
+        }
+
+        private string[] GetDeepDeleteScope(BaseItem item)
+        {
+            var options = _libraryManager.GetLibraryOptions(item);
+            var paths = options?.PathInfos?
+                .Select(p => p.Path)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToArray();
+            if (paths != null && paths.Length > 0) return paths;
+
+            var folder = _fileSystem.GetDirectoryName(item.Path);
+            return string.IsNullOrEmpty(folder) ? Array.Empty<string>() : new[] { folder };
         }
 
         /// <summary>

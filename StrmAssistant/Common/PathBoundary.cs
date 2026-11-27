@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace StrmAssistant.Common
 {
@@ -26,6 +28,21 @@ namespace StrmAssistant.Common
             {
                 return false;
             }
+        }
+
+        public static bool IsLocalFileInScope(string candidatePath, IEnumerable<string> rootPaths)
+        {
+            if (string.IsNullOrWhiteSpace(candidatePath) || rootPaths == null) return false;
+
+            var candidate = candidatePath;
+            if (Uri.TryCreate(candidatePath, UriKind.Absolute, out var uri))
+            {
+                if (!uri.IsFile) return false;
+                candidate = uri.LocalPath;
+            }
+
+            return rootPaths.Any(root => !string.IsNullOrWhiteSpace(root) &&
+                                         IsSameOrDescendant(candidate, root));
         }
 
         private static string Normalize(string path)

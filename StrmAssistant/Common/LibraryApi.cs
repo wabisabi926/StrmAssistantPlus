@@ -1776,14 +1776,23 @@ namespace StrmAssistant.Common
             deleteItems = deleteItems.Where(i => i is IHasMediaSources).ToList();
 
             var mountPaths = new Dictionary<string, bool?>();
-            var single = scope is null;
+            var hasScope = scope != null && scope.Length > 0;
+            var single = !hasScope;
+
+            bool IsLocalPathInScope(string path)
+            {
+                if (!hasScope || string.IsNullOrWhiteSpace(path)) return true;
+                if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile) return true;
+                return scope.Any(root => PathBoundary.IsSameOrDescendant(path, root));
+            }
 
             foreach (var workItem in deleteItems)
             {
                 var mediaSources =
                     workItem.GetMediaSources(!single, false, _libraryManager.GetLibraryOptions(workItem));
                 mediaSources = mediaSources.Where(s =>
-                        single || scope?.Any(p => PathBoundary.IsSameOrDescendant(s.Path, p)) is true)
+                        single || (IsLocalPathInScope(s.Path) &&
+                                   scope.Any(p => PathBoundary.IsSameOrDescendant(s.Path, p))))
                     .ToList();
 
                 var staticMediaSources = Plugin.MediaInfoApi.GetStaticMediaSources(workItem, !single)
@@ -1795,7 +1804,8 @@ namespace StrmAssistant.Common
                     {
                         if (staticMediaSources.TryGetValue(source.Id, out var mountPath) &&
                             Uri.TryCreate(mountPath, UriKind.Absolute, out var uri) && uri.IsAbsoluteUri &&
-                            !string.IsNullOrEmpty(mountPath) && !IsFileShortcut(mountPath))
+                            !string.IsNullOrEmpty(mountPath) && !IsFileShortcut(mountPath) &&
+                            IsLocalPathInScope(mountPath))
                         {
                             mountPaths.TryAdd(mountPath, uri.Scheme == Uri.UriSchemeFile);
                         }
@@ -1806,7 +1816,7 @@ namespace StrmAssistant.Common
 
                         if (!string.IsNullOrEmpty(targetPath) &&
                             Uri.TryCreate(targetPath, UriKind.Absolute, out var uri) && uri.IsAbsoluteUri &&
-                            uri.Scheme == Uri.UriSchemeFile)
+                            uri.Scheme == Uri.UriSchemeFile && PathBoundary.IsLocalFileInScope(targetPath, scope))
                         {
                             mountPaths.TryAdd(targetPath, true);
                         }
