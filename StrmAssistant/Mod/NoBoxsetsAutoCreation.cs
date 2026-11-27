@@ -1,4 +1,5 @@
 ﻿using HarmonyLib;
+using MediaBrowser.Controller.Collections;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
@@ -35,9 +36,17 @@ namespace StrmAssistant.Mod
         {
             var embyServerImplementationsAssembly = Assembly.Load("Emby.Server.Implementations");
 
-            // 4.9/4.10：禁止 Emby 自动创建合集库；4.11 已无此方法（实测）。
-            var collectionManager = embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Collections.CollectionManager");
-            _ensureLibraryFolder = collectionManager?.GetMethod("EnsureLibraryFolder", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
+            {
+                var collectionManager = EmbyTargetResolver.FindImplementationType(
+                    embyServerImplementationsAssembly, typeof(ICollectionManager));
+                _ensureLibraryFolder = FindParameterlessVoidMethod(collectionManager);
+            }
+            else
+            {
+                var collectionManager = embyServerImplementationsAssembly.GetType("Emby.Server.Implementations.Collections.CollectionManager");
+                _ensureLibraryFolder = collectionManager?.GetMethod("EnsureLibraryFolder", BindingFlags.Instance | BindingFlags.NonPublic);
+            }
 
             // 用户视图过滤：4.11 的 UserViewManager 类型名被混淆，从接口实现取。
             var userViewManagerImpl = EmbyTargetResolver.FindImplementationType(
@@ -62,6 +71,18 @@ namespace StrmAssistant.Mod
                 Plugin.Instance.Logger.Info(
                     "NoBoxsetsAutoCreation - EnsureLibraryFolder absent; user-view filter active");
             }
+        }
+
+        internal static MethodInfo FindParameterlessVoidMethod(Type implementationType)
+        {
+            if (implementationType == null) return null;
+
+            var methods = implementationType.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Where(m => m.DeclaringType == implementationType && !m.IsSpecialName &&
+                            m.Name != "Finalize" && m.ReturnType == typeof(void) &&
+                            m.GetParameters().Length == 0 && m.GetMethodBody() != null)
+                .ToArray();
+            return methods.Length == 1 ? methods[0] : null;
         }
 
         protected override void Prepare(bool apply)
