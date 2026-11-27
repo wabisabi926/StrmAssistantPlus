@@ -1246,7 +1246,7 @@ namespace StrmAssistant.Common
                         if (Plugin.SubtitleApi.HasExternalSubtitleChanged(taskItem, directoryService, true))
                         {
                             await Plugin.SubtitleApi
-                                .UpdateExternalSubtitles(taskItem, refreshOptions, false, true).ConfigureAwait(false);
+                                .UpdateExternalSubtitles(taskItem, refreshOptions, false, true, cancellationToken).ConfigureAwait(false);
                         }
 
                         StrmAssistant.Mod.IntroMarkerProtector.RestoreProtectedMarkers(taskItem, protectedMarkers);

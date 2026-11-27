@@ -121,7 +121,7 @@ namespace StrmAssistant.ScheduledTask
                                 if (Plugin.SubtitleApi.HasExternalSubtitleChanged(taskItem, ds, true))
                                 {
                                     await Plugin.SubtitleApi
-                                        .UpdateExternalSubtitles(taskItem, refreshOptions, false, true)
+                                        .UpdateExternalSubtitles(taskItem, refreshOptions, false, true, cancellationToken)
                                         .ConfigureAwait(false);
                                 }
                             }

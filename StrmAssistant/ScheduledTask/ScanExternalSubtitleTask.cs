@@ -24,7 +24,7 @@ namespace StrmAssistant.ScheduledTask
 
         public async Task Execute(CancellationToken cancellationToken, IProgress<double> progress)
         {
-            if (!Plugin.IsPluginEnabled) return;
+            if (!Plugin.IsPluginEnabled || Plugin.IsShuttingDown) return;
 
             _logger.Info("ExternalSubtitle - Scheduled Task Execute");
             _logger.Info("Tier2 Max Concurrent Count: " +
@@ -82,7 +82,7 @@ namespace StrmAssistant.ScheduledTask
                                 true))
                         {
                             await Plugin.SubtitleApi
-                                .UpdateExternalSubtitles(taskItem, refreshOptions, false, persistMediaInfo)
+                                .UpdateExternalSubtitles(taskItem, refreshOptions, false, persistMediaInfo, cancellationToken)
                                 .ConfigureAwait(false);
 
                             _logger.Info("ExternalSubtitle - Item Processed: " + taskItem.Name + " - " + taskItem.Path);
@@ -117,7 +117,14 @@ namespace StrmAssistant.ScheduledTask
                     }
                 }, CancellationToken.None);
                 tasks.Add(task);
-                Task.Delay(10).Wait();
+                try
+                {
+                    await Task.Delay(10, cancellationToken).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    return;
+                }
             }
             await Task.WhenAll(tasks).ConfigureAwait(false);
 

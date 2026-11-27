@@ -620,7 +620,7 @@ namespace StrmAssistant.Common
 
                                         MasterSemaphore.Release();
                                     }
-                                }, cancellationToken);
+                                }, CancellationToken.None);
                                 episodeTasks.Add(task);
                             }
 
@@ -683,7 +683,7 @@ namespace StrmAssistant.Common
                                     {
                                         Tier2Semaphore.Release();
                                     }
-                                }, cancellationToken);
+                                }, CancellationToken.None);
                                 seasonTasks.Add(seasonTask);
 
                                 // 大型剧集库下 seasonTasks 也会累积，闭包会钉住整季 Episode 引用
@@ -898,7 +898,7 @@ namespace StrmAssistant.Common
                                     Tier2Semaphore.Release();
                                     ClearItemExclusiveFeatures(taskItem.InternalId);
                                 }
-                            }, cancellationToken);
+                            }, CancellationToken.None);
                             tasks.Add(task);
 
                             // 周期性剔除已完成的 task，释放它们捕获的 Episode 闭包

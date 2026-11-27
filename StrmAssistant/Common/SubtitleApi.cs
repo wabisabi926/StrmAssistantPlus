@@ -363,8 +363,14 @@ namespace StrmAssistant.Common
             catch { return false; }
         }
 
-        public async Task UpdateExternalSubtitles(BaseItem item, MetadataRefreshOptions refreshOptions, bool clearCache,
+        public Task UpdateExternalSubtitles(BaseItem item, MetadataRefreshOptions refreshOptions, bool clearCache,
             bool persistMediaInfo)
+        {
+            return UpdateExternalSubtitles(item, refreshOptions, clearCache, persistMediaInfo, CancellationToken.None);
+        }
+
+        public async Task UpdateExternalSubtitles(BaseItem item, MetadataRefreshOptions refreshOptions, bool clearCache,
+            bool persistMediaInfo, CancellationToken cancellationToken)
         {
             var directoryService = refreshOptions.DirectoryService;
             var currentStreams = item.GetMediaStreams()
@@ -378,7 +384,7 @@ namespace StrmAssistant.Common
                     var extension = Path.GetExtension(subtitleStream.Path);
                     if (!string.IsNullOrEmpty(extension) && ProbeExtensions.Contains(extension))
                     {
-                        await UpdateExternalSubtitleStream(item, subtitleStream, refreshOptions, CancellationToken.None).ConfigureAwait(false);
+                        await UpdateExternalSubtitleStream(item, subtitleStream, refreshOptions, cancellationToken).ConfigureAwait(false);
                     }
                 }
 
@@ -391,7 +397,7 @@ namespace StrmAssistant.Common
                 }
 
                 currentStreams.AddRange(externalSubtitleStreams);
-                _itemRepository.SaveMediaStreams(item.InternalId, currentStreams, CancellationToken.None);
+                _itemRepository.SaveMediaStreams(item.InternalId, currentStreams, cancellationToken);
 
                 if (persistMediaInfo && Plugin.LibraryApi.IsLibraryInScope(item))
                 {
