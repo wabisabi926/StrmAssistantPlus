@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using StrmAssistant.Common;
+using StrmAssistant.Properties;
+using StrmAssistant.ScheduledTask;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -104,6 +106,89 @@ namespace StrmAssistant.Tests
         public void GetDigestHex_RejectsInvalid(string digest)
         {
             Assert.Null(PluginUpdateService.GetDigestHex(digest));
+        }
+
+        [Theory]
+        [InlineData(null)]
+        [InlineData("")]
+        [InlineData(" ")]
+        [InlineData("sha1:0123456789abcdef0123456789abcdef0123456789")]
+        [InlineData("sha256:not-hex")]
+        public void AutomaticDownloadDigestGate_RejectsMissingOrInvalidDigest(string digest)
+        {
+            var asset = new PluginReleaseAsset
+            {
+                Name = "StrmAssistantPlus_v4.0.0.2.dll",
+                DownloadUrl = "https://example.com/v4.0.0.2.dll",
+                Digest = digest
+            };
+
+            var error = Assert.Throws<InvalidOperationException>(
+                () => PluginUpdateService.RequireSha256Digest(asset));
+
+            Assert.Equal(Resources.PluginUpdate_Error_MissingDigest, error.Message);
+            Assert.Contains("SHA-256", error.Message);
+        }
+
+        [Fact]
+        public void AutomaticDownloadDigestGate_AcceptsValidSha256()
+        {
+            var asset = new PluginReleaseAsset
+            {
+                Digest = "sha256:0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF"
+            };
+
+            Assert.Equal(
+                "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                PluginUpdateService.RequireSha256Digest(asset));
+        }
+
+        [Fact]
+        public void VerifyDownload_WithoutDigest_RejectsAutomaticInstallation()
+        {
+            var assembly = typeof(PluginUpdateTask).Assembly;
+            var asset = new PluginReleaseAsset { Name = "StrmAssistantPlus.dll" };
+
+            var error = Assert.Throws<InvalidOperationException>(() => PluginUpdateTask.VerifyDownload(
+                asset, assembly.Location, new Version(0, 0, 0, 0), assembly.GetName().Version));
+
+            Assert.Equal(Resources.PluginUpdate_Error_MissingDigest, error.Message);
+        }
+
+        [Fact]
+        public void VerifyDownload_WithMatchingDigest_AllowsInstallation()
+        {
+            var assembly = typeof(PluginUpdateTask).Assembly;
+            var asset = new PluginReleaseAsset
+            {
+                Name = "StrmAssistantPlus.dll",
+                Digest = "sha256:" + PluginUpdateService.ComputeSha256(assembly.Location)
+            };
+
+            PluginUpdateTask.VerifyDownload(
+                asset, assembly.Location, new Version(0, 0, 0, 0), assembly.GetName().Version);
+        }
+
+        [Fact]
+        public void MissingDigestFailure_PreservesReasonAndDoesNotReportUpdated()
+        {
+            var asset = new PluginReleaseAsset { Name = "StrmAssistantPlus.dll" };
+            var error = Assert.Throws<InvalidOperationException>(
+                () => PluginUpdateService.RequireSha256Digest(asset));
+            var status = new PluginUpdateStatus
+            {
+                State = PluginUpdateState.Failed,
+                CurrentVersion = "4.0.1.2",
+                LatestVersion = "4.0.1.3",
+                Message = error.Message
+            };
+
+            var summary = PluginUpdateService.Summarize(status);
+
+            Assert.Equal(PluginUpdateState.Failed, status.State);
+            Assert.Equal(Resources.PluginUpdate_Error_MissingDigest, status.Message);
+            Assert.Contains(status.Message, summary);
+            Assert.DoesNotContain(Resources.PluginUpdate_Status_Updated, summary);
         }
 
         [Theory]

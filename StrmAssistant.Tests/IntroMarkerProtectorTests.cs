@@ -1,7 +1,10 @@
 using MediaBrowser.Controller.Entities.Movies;
+using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.Entities;
 using StrmAssistant.Mod;
+using System;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -117,6 +120,24 @@ namespace StrmAssistant.Tests
             Assert.True(IntroMarkerProtector.IsBypassed(42));
             IntroMarkerProtector.ClearBypass();
             Assert.False(IntroMarkerProtector.IsBypassed(42));
+        }
+
+        [Fact]
+        public async Task RestoreAfterRefresh_ReturnsRefreshResult()
+        {
+            var result = await IntroMarkerProtector.RestoreAfterRefreshAsync(
+                Task.FromResult(ItemUpdateType.None), null, new List<ChapterInfo>());
+
+            Assert.Equal(ItemUpdateType.None, result);
+        }
+
+        [Fact]
+        public async Task RestoreAfterRefresh_PropagatesRefreshFailure()
+        {
+            var refresh = Task.FromException<ItemUpdateType>(new InvalidOperationException("refresh failed"));
+
+            await Assert.ThrowsAsync<InvalidOperationException>(() =>
+                IntroMarkerProtector.RestoreAfterRefreshAsync(refresh, null, new List<ChapterInfo>()));
         }
 
         [Fact]

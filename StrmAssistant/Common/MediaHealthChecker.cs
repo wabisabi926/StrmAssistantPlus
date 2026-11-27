@@ -97,7 +97,7 @@ namespace StrmAssistant.Common
         public static List<MediaHealthIssue> Check(MediaHealthInput input)
         {
             var issues = new List<MediaHealthIssue>();
-            if (input == null) return issues;
+            if (!CanEvaluate(input)) return issues;
 
             var fileName = input.FileName ?? string.Empty;
             var video = input.Streams.FirstOrDefault(s => IsType(s, "Video"));
@@ -166,7 +166,7 @@ namespace StrmAssistant.Common
             }
 
             // 6. 零时长
-            if (!input.RunTimeTicks.HasValue || input.RunTimeTicks.Value <= 0)
+            if (input.RunTimeTicks.HasValue && input.RunTimeTicks.Value <= 0)
             {
                 Add(MediaHealthSeverity.Critical, "ZeroDuration", BuildDetail("ZeroDuration"));
             }
@@ -182,6 +182,10 @@ namespace StrmAssistant.Common
 
             return issues;
         }
+
+        internal static bool CanEvaluate(MediaHealthInput input) =>
+            input?.Streams != null && input.Streams.Any(s =>
+                IsType(s, "Video") || IsType(s, "Audio") || IsType(s, "Subtitle"));
 
         public static string BuildDetail(string code, params object[] args)
         {

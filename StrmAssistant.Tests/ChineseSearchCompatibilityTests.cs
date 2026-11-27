@@ -31,6 +31,47 @@ namespace StrmAssistant.Tests
             Assert.Equal(2, target.Method.GetParameters().Length);
         }
 
+        [Fact]
+        public void SimplifiedSweepFailure_IsReportedAsAlternativeAndRecoversOnSuccess()
+        {
+            var tracker = new PatchTracker(typeof(EnhanceChineseSearch), PatchApproach.Harmony);
+            try
+            {
+                EnhanceChineseSearch.SetSimplifiedSweepStatus(tracker, false);
+
+                Assert.Equal(PatchStatus.AlternativeActive, tracker.Status);
+                Assert.Equal(EnhanceChineseSearch.SimplifiedSweepDegradedReason, tracker.AlternativeReason);
+                Assert.True(tracker.IsHealthy);
+
+                EnhanceChineseSearch.SetSimplifiedSweepStatus(tracker, true);
+
+                Assert.Equal(PatchStatus.Applied, tracker.Status);
+                Assert.Null(tracker.AlternativeReason);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
+        [Fact]
+        public void SimplifiedSweepSuccess_DoesNotClearOtherAlternativeReason()
+        {
+            var tracker = new PatchTracker(typeof(EnhanceChineseSearch), PatchApproach.Harmony);
+            try
+            {
+                tracker.MarkAlternativeActive("another active alternative");
+                EnhanceChineseSearch.SetSimplifiedSweepStatus(tracker, true);
+
+                Assert.Equal(PatchStatus.AlternativeActive, tracker.Status);
+                Assert.Equal("another active alternative", tracker.AlternativeReason);
+            }
+            finally
+            {
+                PatchManager.PatchTrackerList.Remove(tracker);
+            }
+        }
+
         private static string CreateSearchTerm(string searchTerm, bool matchAnyWord) => searchTerm;
     }
 }

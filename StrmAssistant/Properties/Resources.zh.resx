@@ -1931,6 +1931,9 @@
   <data name="PluginUpdate_Error_FallbackParse" xml:space="preserve">
     <value>Releases 页面未返回可识别的版本标签。</value>
   </data>
+  <data name="PluginUpdate_Error_MissingDigest" xml:space="preserve">
+    <value>Release 资产缺少有效的 SHA-256 校验值，已跳过自动下载和安装；请等待 GitHub API 恢复或稍后重试。</value>
+  </data>
   <data name="PluginUpdate_Activity_UpdateAvailable" xml:space="preserve">
     <value>发现插件更新</value>
   </data>

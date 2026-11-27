@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using StrmAssistant.Common;
+using StrmAssistant.ScheduledTask;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -135,12 +136,63 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
-        public void ZeroDuration_Reported_WhenTicksMissing()
+        public void ZeroDuration_NotReported_WhenTicksUnknown()
         {
             var input = Input("Movie.2020.mkv", Video(1080), Audio(), Subtitle());
             input.RunTimeTicks = null;
 
-            Assert.Contains("ZeroDuration", Codes(input));
+            Assert.DoesNotContain("ZeroDuration", Codes(input));
+        }
+
+        [Fact]
+        public void ZeroDuration_Reported_ForRealZeroTicks()
+        {
+            var input = Input("Movie.2020.mkv", Video(1080), Audio(), Subtitle());
+            input.RunTimeTicks = 0;
+
+            var issue = MediaHealthChecker.Check(input).FirstOrDefault(i => i.Code == "ZeroDuration");
+            Assert.NotNull(issue);
+            Assert.Equal(MediaHealthSeverity.Critical, issue.Severity);
+        }
+
+        [Fact]
+        public void Check_NullOrStreamlessInput_ProducesNoIssues()
+        {
+            Assert.Empty(MediaHealthChecker.Check(null));
+
+            var input = new MediaHealthInput { FileName = "Movie.2020.mkv", RunTimeTicks = 0 };
+            Assert.Empty(MediaHealthChecker.Check(input));
+
+            input.Streams = null;
+            Assert.Empty(MediaHealthChecker.Check(input));
+
+            input.Streams = new List<MediaHealthStream> { null };
+            Assert.Empty(MediaHealthChecker.Check(input));
+
+            input.Streams = new List<MediaHealthStream> { new MediaHealthStream { Type = "Data" } };
+            Assert.Empty(MediaHealthChecker.Check(input));
+        }
+
+        [Fact]
+        public void CountEvaluation_StreamlessInput_IncrementsOnlySkipped()
+        {
+            var report = new MediaHealthReport();
+            var input = new MediaHealthInput { RunTimeTicks = 0 };
+
+            Assert.False(MediaHealthCheckTask.CountEvaluation(report, input));
+            Assert.Equal(0, report.ItemsChecked);
+            Assert.Equal(1, report.SkippedItems);
+        }
+
+        [Fact]
+        public void CountEvaluation_EvaluableInput_IncrementsOnlyChecked()
+        {
+            var report = new MediaHealthReport();
+            var input = Input("Movie.2020.mkv", Video(1080), Audio(), Subtitle());
+
+            Assert.True(MediaHealthCheckTask.CountEvaluation(report, input));
+            Assert.Equal(1, report.ItemsChecked);
+            Assert.Equal(0, report.SkippedItems);
         }
 
         [Fact]

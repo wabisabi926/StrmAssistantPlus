@@ -8,7 +8,7 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 718/718 通过；Release 构建 0 警告 0 错误。
+- 单测 747/747 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护；4.11 外挂字幕扫描与合集自动建库拦截恢复。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
@@ -16,9 +16,10 @@
 - 4.11 通知保留原生分组与插件自定义通知；剧集摘要注入确认为不可靠，已跳过相关钩子。4.10 完整通知补丁可用。
 - 明确限制：4.11 不挂批量 DTO、不 patch `SaveChapters`；ExclusiveExtract 保持受限模式并关闭；插件指纹使用原生检测。
 - `UnlockIntroSkip` STRM 修复通过：真实片头样本两集均被原生任务选中；合成片尾样本的普通 MP4、本地 STRM 与本机 Range STRM 均写入 `CreditsStart` 标记。
-- 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余两个被 Windows 句柄锁住的空缓存目录，无数据残留。
-- 4.11 适配、发布前安全修复、STRM 片尾与外挂字幕恢复已递交推送；空引用防护已本地递交，合集自动建库拦截待递交，升版本号、打 tag 和发版均需用户确认。
-- 运行时验收：合集拦截 DLL（SHA-256 `1f3ec199…`）在主 4.11 与 4.10 测试实例均唯一命中目标、`NoBoxsetsAutoCreation=Applied`、启动 Healthy；上一批外挂字幕小库落库验收通过。
+- 真实片尾内容验收通过：隔离 4.11 层级库使用《隐秘而伟大》S01E08/E15 真实 1080p H264 STRM，原生 `Detect Credits` 2 分 20 秒完成，分别写入 `CreditsStart=43:07.648` 与 `43:01.056`，均距片尾约 2 分 24 秒；条目 API 返回 `MarkerType=CreditsStart`，FullRefresh 后标记保留。播放器视觉验收因 4K 样本缓冲未完成，未计入通过。
+- 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库、最终字幕/合集验收小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余数个被 Windows 句柄锁住的空缓存目录，无数据库、配置或媒体残留。
+- 截至 `f80c3d8` 的 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复与合集自动建库拦截已推送；本轮安全修复、普通刷新标记保护与真实片尾验收尚未提交，`main` 仍指向 `f80c3d8`。未升版本、未打 tag、未发版。
+- 最终候选 DLL SHA-256 `344e1e5365de766565aad4293b02bdc72e739ad9a4ab076e004785e28a633f9f` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
@@ -185,14 +186,15 @@ title sample` / `probe summary: 256/300 clips, probe=2V/2A/0S` / `corrected bitr
 - 外挂字幕探测更新器按 `IMediaProbeManager` 构造参数和 `(BaseItem,MediaStream,MetadataRefreshOptions,LibraryOptions,CancellationToken) -> Task<bool>` 唯一签名解析；4.11 使用 Reflection，不再对混淆方法名做 Harmony 逆向补丁。
 - 4.10 保持原类型名与 Harmony 路径；两套实例启动均 Healthy。
 - 隔离 4.11 单电影小库：初始无外挂字幕，新增 `.srt` 后运行“扫描外挂字幕与音轨”，DTO 落库 `IsExternal=True`、语言 `zh`，日志 `ExternalSubtitle - Item Processed`，字幕错误 0。
-- 全量 715/715 通过，Release 构建 0 警告 0 错误；最终 DLL SHA-256 `44b98ad37187f25bf287970cc39696e6950e0ca9a90f20f0fbb9852894bdf496`。
+- 补充特殊格式验收：新增 `.smi` 后探测为 `Codec=sami`、语言 `zh`，无 `No result when probing external track` 警告；清空 `MediaStreams2` 后运行恢复任务，JSON 恢复 `.smi` 并自动补入新增 `.srt`，字幕与运行时错误均为 0。
+- 全量 718/718 通过，Release 构建 0 警告 0 错误；最终 DLL SHA-256 `1f3ec19997cd4bf54c5508519662536a691cb4f47967fbdf4663958538cd8639`。
 
 ### 8. 4.11 阻止合集库自动创建 — ✅ 已完成（2026-11-27）
 
 - 4.11 的 `ICollectionManager` 实现保留一个私有无参 `void` 自动建库方法，内部读取 `BoxSets` 默认库选项并调用 `AddVirtualFolder`。
 - 插件从接口实现取具体类型，只允许该签名唯一命中时打 Harmony prefix；歧义或缺失时不拦截，用户视图过滤继续生效。
 - 4.9/4.10 保持原 `CollectionManager.EnsureLibraryFolder` 路径。
-- 主 4.11.0.19 与 4.10.2.0 实测均为 `NoBoxsetsAutoCreation=Applied`、启动 `Healthy`；全量 718/718 通过，Release 构建 0 警告 0 错误。
+- 主 4.11.0.19 与 4.10.2.0 实测均为 `NoBoxsetsAutoCreation=Applied`、启动 `Healthy`；隔离 4.11 实际创建合集后 BoxSets 虚拟库数量保持 0；全量 718/718 通过，Release 构建 0 警告 0 错误。
 - 最终 DLL SHA-256 `1f3ec19997cd4bf54c5508519662536a691cb4f47967fbdf4663958538cd8639`。
 
 ### 9. 4.9 / ARM64 回归（仅用户需要时）

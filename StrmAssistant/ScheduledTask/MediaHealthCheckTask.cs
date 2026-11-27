@@ -72,19 +72,25 @@ namespace StrmAssistant.ScheduledTask
                     progress.Report(index / (double)items.Count * 100);
                 }
 
+                var itemName = item?.Name ?? "Unknown item";
                 try
                 {
                     var jsonPath = MediaInfoApi.GetMediaInfoJsonReadPath(item, directoryService);
                     if (string.IsNullOrEmpty(jsonPath) || !File.Exists(jsonPath))
                     {
                         report.SkippedItems++;
+                        _logger.Info($"MediaHealth - {itemName}: skipped, media info unavailable");
                         continue;
                     }
 
-                    var input = ParseInput(item.Name, item.Path, jsonPath);
-                    report.ItemsChecked++;
-
+                    var input = ParseInput(itemName, item.Path, jsonPath);
                     var issues = MediaHealthChecker.Check(input);
+                    if (!CountEvaluation(report, input))
+                    {
+                        _logger.Info($"MediaHealth - {itemName}: skipped, no media streams");
+                        continue;
+                    }
+
                     infoIssues += issues.Count(i => i.Severity == MediaHealthSeverity.Info);
 
                     // 提示级只汇总计数：全库「无字幕」若逐条列出会把报告刷爆
@@ -100,7 +106,8 @@ namespace StrmAssistant.ScheduledTask
                 }
                 catch (Exception e)
                 {
-                    _logger.Debug($"MediaHealth - {item.Name}: {e.Message}");
+                    report.SkippedItems++;
+                    _logger.Warn($"MediaHealth - {itemName}: skipped, media info could not be evaluated: {e.Message}");
                 }
             }
 
@@ -108,6 +115,12 @@ namespace StrmAssistant.ScheduledTask
             report.Critical = report.Issues.Count(i => i.Severity == MediaHealthSeverity.Critical);
             report.Warning = report.Issues.Count(i => i.Severity == MediaHealthSeverity.Warning);
             report.Info = infoIssues;
+
+            if (report.SkippedItems > 0)
+            {
+                _logger.Warn($"MediaHealth - Incomplete coverage: {report.ItemsChecked} checked, " +
+                             $"{report.SkippedItems} of {items.Count} skipped");
+            }
 
             progress.Report(100);
 
@@ -132,6 +145,18 @@ namespace StrmAssistant.ScheduledTask
                 $"[{Resources.PluginOptions_EditorTitle_Strm_Assistant}] {message}", 12000);
 
             return Task.CompletedTask;
+        }
+
+        internal static bool CountEvaluation(MediaHealthReport report, MediaHealthInput input)
+        {
+            if (!MediaHealthChecker.CanEvaluate(input))
+            {
+                report.SkippedItems++;
+                return false;
+            }
+
+            report.ItemsChecked++;
+            return true;
         }
 
         private static MediaHealthInput ParseInput(string itemName, string itemPath, string jsonPath)

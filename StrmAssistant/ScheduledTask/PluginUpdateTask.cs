@@ -130,6 +130,9 @@ namespace StrmAssistant.ScheduledTask
                     throw new InvalidOperationException($"Release {latestVersion} 中没有匹配的 DLL 资产");
                 }
 
+                // 页面回退无法提供 Digest；任何无有效 SHA-256 的资产都必须在下载前拒绝。
+                PluginUpdateService.RequireSha256Digest(asset);
+
                 var localDll = ResolveLocalDll();
                 if (string.IsNullOrEmpty(localDll))
                 {
@@ -304,7 +307,7 @@ namespace StrmAssistant.ScheduledTask
 
         /// <summary>
         /// API 限额用尽（403）时的回退：releases/latest 是普通页面重定向，不占用 API 额度。
-        /// 资产名由固定命名规则构造，因此不依赖 API 返回的 assets/digest。
+        /// 资产名由固定命名规则构造，不依赖 API 返回的 assets/digest；无 Digest 时仅通知，不自动安装。
         /// </summary>
         private static async Task<PluginReleaseInfo> GetLatestReleaseFromPageAsync(PluginUpdateOptions options,
             CancellationToken cancellationToken)
@@ -420,23 +423,22 @@ namespace StrmAssistant.ScheduledTask
             }
         }
 
-        private static void VerifyDownload(PluginReleaseAsset asset, string tempFile, Version currentVersion,
+        internal static void VerifyDownload(PluginReleaseAsset asset, string tempFile, Version currentVersion,
             Version latestVersion)
         {
+            // 下载前已校验 Digest；替换前再次强制校验，避免缺失 Digest 的资产绕过哈希验证。
+            var expected = PluginUpdateService.RequireSha256Digest(asset);
+
             if (asset.Size.HasValue && asset.Size.Value > 0 &&
                 new FileInfo(tempFile).Length != asset.Size.Value)
             {
                 throw new InvalidOperationException("下载文件大小与 Release 资产不一致");
             }
 
-            var expected = PluginUpdateService.GetDigestHex(asset.Digest);
-            if (!string.IsNullOrEmpty(expected))
+            var actual = PluginUpdateService.ComputeSha256(tempFile);
+            if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
             {
-                var actual = PluginUpdateService.ComputeSha256(tempFile);
-                if (!string.Equals(expected, actual, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new InvalidOperationException("下载文件 SHA-256 校验失败");
-                }
+                throw new InvalidOperationException("下载文件 SHA-256 校验失败");
             }
 
             var assemblyName = AssemblyName.GetAssemblyName(tempFile);

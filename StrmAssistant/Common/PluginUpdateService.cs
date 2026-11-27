@@ -279,6 +279,17 @@ namespace StrmAssistant.Common
             return BitConverter.ToString(sha.ComputeHash(stream)).Replace("-", string.Empty).ToLowerInvariant();
         }
 
+        internal static string RequireSha256Digest(PluginReleaseAsset asset)
+        {
+            var expected = asset == null ? null : GetDigestHex(asset.Digest);
+            if (string.IsNullOrEmpty(expected))
+            {
+                throw new InvalidOperationException(Resources.PluginUpdate_Error_MissingDigest);
+            }
+
+            return expected;
+        }
+
         internal static string GetDigestHex(string digest)
         {
             if (string.IsNullOrWhiteSpace(digest)) return null;

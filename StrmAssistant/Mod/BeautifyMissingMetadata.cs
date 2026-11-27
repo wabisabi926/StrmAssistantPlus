@@ -67,17 +67,23 @@ namespace StrmAssistant.Mod
             _getMainExpression = EmbyTargetResolver.ResolveByName(typeof(NamingOptions), "GetMainExpression",
                 new[] { typeof(bool), typeof(bool), typeof(bool) }, typeof(string), true).Method;
 
-            _setName = typeof(BaseItemDto).GetProperty("Name", BindingFlags.Public | BindingFlags.Instance)
-                ?.GetSetMethod(true);
-            _setPath = typeof(BaseItemDto).GetProperty("Path", BindingFlags.Public | BindingFlags.Instance)
-                ?.GetSetMethod(true);
+            var singleOnly = !DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion);
+            var setName = EmbyTargetResolver.ResolvePropertySetter(typeof(BaseItemDto), "Name");
+            var setPath = EmbyTargetResolver.ResolvePropertySetter(typeof(BaseItemDto), "Path");
+            if (singleOnly)
+            {
+                Require(setName);
+                Require(setPath);
+            }
+            _setName = setName.Method;
+            _setPath = setPath.Method;
 
             _beautifySetters.Clear();
             foreach (var propertyName in new[] { "Type", "IndexNumber", "PreferredMetadataLanguage" })
             {
-                var setter = typeof(BaseItemDto).GetProperty(propertyName,
-                    BindingFlags.Public | BindingFlags.Instance)?.GetSetMethod(true);
-                if (setter != null) _beautifySetters.Add(setter);
+                var setter = EmbyTargetResolver.ResolvePropertySetter(typeof(BaseItemDto), propertyName);
+                if (singleOnly) Require(setter);
+                if (setter.IsFound) _beautifySetters.Add(setter.Method);
             }
         }
 
@@ -119,6 +125,11 @@ namespace StrmAssistant.Mod
                 foreach (var setter in _beautifySetters)
                 {
                     PatchUnpatch(PatchTracker, apply, setter, postfix: nameof(SetNamePostfix));
+                }
+
+                if (apply)
+                {
+                    PatchTracker.MarkAlternativeActive("single-item DTO + BaseItemDto setters; batch DTO patch disabled");
                 }
 
                 if (apply && !_logged411Partial)

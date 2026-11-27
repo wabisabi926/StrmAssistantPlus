@@ -2018,6 +2018,9 @@
   <data name="PluginUpdate_Error_FallbackParse" xml:space="preserve">
     <value>The releases page did not return a recognizable version tag.</value>
   </data>
+  <data name="PluginUpdate_Error_MissingDigest" xml:space="preserve">
+    <value>The Release asset has no valid SHA-256 checksum; automatic download and installation were skipped. Wait for the GitHub API to recover or try again later.</value>
+  </data>
   <data name="PluginUpdate_Activity_UpdateAvailable" xml:space="preserve">
     <value>Plugin update available</value>
   </data>

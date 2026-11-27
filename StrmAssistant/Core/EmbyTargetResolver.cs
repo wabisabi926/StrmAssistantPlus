@@ -104,6 +104,25 @@ namespace StrmAssistant.Core
             }
         }
 
+        public static TargetResolution ResolvePropertySetter(Type type, string propertyName)
+        {
+            var description = $"{type?.FullName ?? "<unresolved>"}.{propertyName} setter";
+            if (type == null) return TargetResolution.Missing(description, "type not resolved");
+
+            try
+            {
+                var setter = type.GetProperty(propertyName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+                    ?.GetSetMethod(true);
+                return setter != null
+                    ? TargetResolution.Success(setter, description)
+                    : TargetResolution.Missing(description, "property setter not found");
+            }
+            catch (Exception e)
+            {
+                return TargetResolution.Missing(description, e.Message);
+            }
+        }
+
         /// <summary>
         /// 只按参数/返回类型找方法（4.11 混淆方法名时使用）。找不到唯一匹配就失败。
         /// </summary>

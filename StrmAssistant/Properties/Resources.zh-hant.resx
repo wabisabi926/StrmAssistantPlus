@@ -1931,6 +1931,9 @@
   <data name="PluginUpdate_Error_FallbackParse" xml:space="preserve">
     <value>Releases 頁面未傳回可辨識的版本標籤。</value>
   </data>
+  <data name="PluginUpdate_Error_MissingDigest" xml:space="preserve">
+    <value>Release 資產缺少有效的 SHA-256 校驗碼，已跳過自動下載和安裝；請等待 GitHub API 恢復或稍後重試。</value>
+  </data>
   <data name="PluginUpdate_Activity_UpdateAvailable" xml:space="preserve">
     <value>發現外掛更新</value>
   </data>

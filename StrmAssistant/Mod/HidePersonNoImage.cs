@@ -57,12 +57,12 @@ namespace StrmAssistant.Mod
             _getBaseItemDtosWithCancellation = EmbyTargetResolver.ResolveByName(dtoServiceImpl, "GetBaseItemDtos",
                 new[] { typeof(BaseItem[]), typeof(DtoOptions), typeof(User), typeof(CancellationToken) }).Method;
 
-            var peopleProperty = typeof(BaseItemDto).GetProperty("People",
-                BindingFlags.Public | BindingFlags.Instance);
-            if (peopleProperty?.GetSetMethod(true) is MethodInfo setter)
+            var setPeople = EmbyTargetResolver.ResolvePropertySetter(typeof(BaseItemDto), "People");
+            if (!DtoPatchPolicy.UseBatchDto(EmbyVersionAdapter.Instance.ApiVersion))
             {
-                _setPeople = setter;
+                Require(setPeople);
             }
+            _setPeople = setPeople.Method;
         }
 
         protected override void Prepare(bool apply)
@@ -86,6 +86,11 @@ namespace StrmAssistant.Mod
                 if (_setPeople != null)
                 {
                     PatchUnpatch(PatchTracker, apply, _setPeople, prefix: nameof(SetPeoplePrefix));
+                }
+
+                if (apply)
+                {
+                    PatchTracker.MarkAlternativeActive("single-item DTO + BaseItemDto.People setter; batch DTO patch disabled");
                 }
 
                 if (apply && !_logged411Partial)

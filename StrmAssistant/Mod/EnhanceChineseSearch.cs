@@ -938,7 +938,7 @@ namespace StrmAssistant.Mod
 
                 connection.Execute(populateQuery);
 
-                ApplySimplifiedSweep(connection, ftsTableName);
+                var simplifiedSweepApplied = ApplySimplifiedSweep(connection, ftsTableName);
 
                 // MixedChineseVariants：在简繁归一化之上再做变体归一化（全角/标点变体等）。
                 if (Plugin.Instance.MainOptionsStore.GetOptions().ChineseSearch.MixedChineseVariants)
@@ -947,6 +947,7 @@ namespace StrmAssistant.Mod
                 }
 
                 connection.CommitTransaction();
+                SetSimplifiedSweepStatus(Instance.PatchTracker, simplifiedSweepApplied);
 
                 WriteNormV2Marker();
                 WriteTokenizerMarker(ComputeSha1(_tokenizerPath));
@@ -975,11 +976,31 @@ namespace StrmAssistant.Mod
             return false;
         }
 
+        internal const string SimplifiedSweepDegradedReason = "FTS rebuilt without traditional-to-simplified sweep";
+
+        internal static void SetSimplifiedSweepStatus(PatchTracker tracker, bool applied)
+        {
+            if (tracker == null) return;
+
+            if (!applied)
+            {
+                tracker.MarkAlternativeActive(SimplifiedSweepDegradedReason);
+                return;
+            }
+
+            if (tracker.Status == PatchStatus.AlternativeActive &&
+                tracker.AlternativeReason == SimplifiedSweepDegradedReason)
+            {
+                tracker.Status = PatchStatus.Applied;
+                tracker.AlternativeReason = null;
+            }
+        }
+
         /// <summary>
         /// 重建填充后扫描 FTS 全表，把仍为繁体的词条改写为简体（SQL populate 无法调用托管转换，
         /// 用一次性 UPDATE 补齐），失败仅降级为无简繁索引，不阻断重建。
         /// </summary>
-        private static void ApplySimplifiedSweep(IDatabaseConnection connection, string ftsTableName)
+        private static bool ApplySimplifiedSweep(IDatabaseConnection connection, string ftsTableName)
         {
             try
             {
@@ -1034,7 +1055,10 @@ namespace StrmAssistant.Mod
                 {
                     Plugin.Instance.Logger.Debug(e.StackTrace);
                 }
+                return false;
             }
+
+            return true;
         }
 
         /// <summary>

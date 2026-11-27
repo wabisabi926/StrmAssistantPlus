@@ -2,6 +2,9 @@ using HarmonyLib;
 using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.Movies;
 using MediaBrowser.Controller.Entities.TV;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Configuration;
 using MediaBrowser.Model.Entities;
 using StrmAssistant.Common;
 using StrmAssistant.Core;
@@ -10,6 +13,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using System.Threading.Tasks;
 using static StrmAssistant.Mod.PatchManager;
 
 namespace StrmAssistant.Mod
@@ -23,7 +27,14 @@ namespace StrmAssistant.Mod
     public class IntroMarkerProtector : PatchBase<IntroMarkerProtector>
     {
         private static MethodInfo _saveChapters;
+        private static MethodInfo _refreshSingleItem;
         private static readonly AsyncLocal<long> BypassItem = new AsyncLocal<long>();
+
+        private sealed class RefreshMarkerState
+        {
+            public BaseItem Item { get; set; }
+            public List<ChapterInfo> Markers { get; set; }
+        }
 
         private static readonly MarkerType[] ProtectedMarkerTypes =
         {
@@ -42,8 +53,17 @@ namespace StrmAssistant.Mod
         {
             if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
             {
+                var providerManager = Assembly.Load("Emby.Providers")
+                    .GetType("Emby.Providers.Manager.ProviderManager");
+                _refreshSingleItem = Require(EmbyTargetResolver.ResolveByName(providerManager, "RefreshSingleItem",
+                    new[]
+                    {
+                        typeof(BaseItem), typeof(MetadataRefreshOptions), typeof(BaseItem[]),
+                        typeof(LibraryOptions), typeof(CancellationToken)
+                    }, typeof(Task<ItemUpdateType>))).Method;
+
                 Plugin.Instance.Logger.Info(
-                    "IntroMarkerProtector - 4.11: SaveChapters hook skipped; post-refresh marker restore active");
+                    "IntroMarkerProtector - 4.11: SaveChapters hook skipped; ProviderManager refresh snapshot/restore active");
                 return;
             }
 
@@ -68,7 +88,9 @@ namespace StrmAssistant.Mod
         {
             if (EmbyVersionAdapter.Instance.ApiVersion >= EmbyApiVersion.V4_11)
             {
-                PatchTracker.MarkAlternativeActive("post-refresh marker snapshot/restore");
+                PatchUnpatch(PatchTracker, apply, _refreshSingleItem,
+                    prefix: nameof(RefreshSingleItem411Prefix), postfix: nameof(RefreshSingleItem411Postfix));
+                PatchTracker.MarkAlternativeActive("ProviderManager refresh snapshot/restore");
                 return;
             }
             PatchUnpatch(PatchTracker, apply, _saveChapters, prefix: nameof(SaveChaptersPrefix));
@@ -127,6 +149,38 @@ namespace StrmAssistant.Mod
         }
 
 
+        [HarmonyPrefix]
+        private static void RefreshSingleItem411Prefix(BaseItem __0, ref RefreshMarkerState __state)
+        {
+            if (!(__0 is Episode) && !(__0 is Movie)) return;
+
+            __state = new RefreshMarkerState
+            {
+                Item = __0,
+                Markers = CaptureProtectedMarkers(__0)
+            };
+        }
+
+        [HarmonyPostfix]
+        private static void RefreshSingleItem411Postfix(ref Task<ItemUpdateType> __result, RefreshMarkerState __state)
+        {
+            if (__result == null || __state?.Item == null || __state.Markers.Count == 0) return;
+            __result = RestoreAfterRefreshAsync(__result, __state.Item, __state.Markers);
+        }
+
+        internal static async Task<ItemUpdateType> RestoreAfterRefreshAsync(Task<ItemUpdateType> refreshTask,
+            BaseItem item, List<ChapterInfo> markers)
+        {
+            try
+            {
+                return await refreshTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                RestoreProtectedMarkers(item, markers);
+            }
+        }
+
         internal static List<ChapterInfo> CaptureProtectedMarkers(BaseItem item)
         {
             try
@@ -138,7 +192,7 @@ namespace StrmAssistant.Mod
             }
             catch (Exception e)
             {
-                Plugin.Instance.Logger.Debug("IntroMarkerProtector - capture failed: " + e.Message);
+                Plugin.Instance?.Logger?.Warn("IntroMarkerProtector - capture failed: " + e.Message);
                 return new List<ChapterInfo>();
             }
         }
@@ -162,7 +216,7 @@ namespace StrmAssistant.Mod
             }
             catch (Exception e)
             {
-                Plugin.Instance.Logger.Debug("IntroMarkerProtector - restore failed: " + e.Message);
+                Plugin.Instance?.Logger?.Warn("IntroMarkerProtector - restore failed: " + e.Message);
                 return false;
             }
         }

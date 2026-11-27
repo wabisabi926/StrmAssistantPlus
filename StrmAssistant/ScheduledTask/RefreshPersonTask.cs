@@ -36,6 +36,12 @@ namespace StrmAssistant.ScheduledTask
         {
             if (!Plugin.IsPluginEnabled) return;
 
+            if (DryRunMode.Skip("RefreshPerson - scheduled task", _logger))
+            {
+                progress.Report(100);
+                return;
+            }
+
             _logger.Info("RefreshPerson - Scheduled Task Execute");
             await Task.Yield();
             progress.Report(0);
@@ -103,6 +109,13 @@ namespace StrmAssistant.ScheduledTask
                             $"RefreshPerson - Deleting duplicate person {dupItem.Name} related to {relatedItem.Path}");
                     }
                 }
+
+                if (DryRunMode.Skip("RefreshPerson - delete duplicate persons", _logger))
+                {
+                    progress.Report(100);
+                    return;
+                }
+
                 _libraryManager.DeleteItems(dupPersonItems.Select(i => i.InternalId).ToArray());
             }
             _logger.Info("RefreshPerson - Number of Duplicate Persons Deleted: " + dupPersonItems.Count);

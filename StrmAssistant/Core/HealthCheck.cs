@@ -295,10 +295,10 @@ namespace StrmAssistant.Core
         {
             _componentStatus[componentName] = status;
             
-            // 更新整体状态
-            if ((int)status > (int)OverallStatus)
+            var effectiveStatus = status == HealthStatus.Unknown ? HealthStatus.Degraded : status;
+            if ((int)effectiveStatus > (int)OverallStatus)
             {
-                OverallStatus = status;
+                OverallStatus = effectiveStatus;
             }
             
             // 记录问题

@@ -12,9 +12,11 @@ namespace StrmAssistant.Common
             Plugin.Instance?.ExperienceEnhanceStore?.GetOptions()?.Safety?.DryRun == true;
 
         /// <summary>开启演练时记录一条日志并返回 true，调用方应直接跳过写操作。</summary>
-        public static bool Skip(string action, ILogger logger = null)
+        public static bool Skip(string action, ILogger logger = null) => Skip(action, Enabled, logger);
+
+        internal static bool Skip(string action, bool enabled, ILogger logger = null)
         {
-            if (!Enabled) return false;
+            if (!enabled) return false;
 
             (logger ?? Plugin.Instance?.Logger)?.Info("DryRun - skipped: " + action);
             return true;
