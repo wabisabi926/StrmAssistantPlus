@@ -89,7 +89,7 @@ namespace StrmAssistant.Options.View
             ExperienceEnhanceOptions.Merge.SplitMoviesButton.IsEnabled = true;
             progressItem.HasPercentage = false;
             progressItem.SecondaryText = dryRun
-                ? $"演练：将拆分 {total} 组"
+                ? string.Format(Resources.ExperienceEnhanceOptions_DryRunPreview, total)
                 : Resources.Operation_Success;
             progressItem.Icon = IconNames.info;
             progressItem.Status = ItemStatus.Succeeded;

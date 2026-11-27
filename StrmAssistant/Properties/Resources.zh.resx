@@ -1140,7 +1140,7 @@
     <value>同时刮削电影；仅写章节标记，不参与跳过。默认关闭。</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Api_Key" xml:space="preserve">
-    <value>IntroDb API Key</value>
+    <value>introdb.app API Key</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Optional_TheIntroDB_API_key_sent_via_Bearer_auth_to_raise_the_daily_request_limit__Default_is_empty_" xml:space="preserve">
     <value>introdb.app 的 Key，按 IMDb ID 查询；留空使用公共限额。</value>
@@ -1993,5 +1993,8 @@
   </data>
   <data name="ScheduledTask_Category_PluginUpdate" xml:space="preserve">
     <value>插件更新</value>
+  </data>
+  <data name="ExperienceEnhanceOptions_DryRunPreview" xml:space="preserve">
+    <value>演练：将拆分 {0} 组</value>
   </data>
 </root>

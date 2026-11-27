@@ -29,11 +29,13 @@ namespace StrmAssistant.Options
         /// <summary>双层杜比视界：把 1080p 增强层标注为 Profile 7.6。</summary>
         [DisplayNameL("MediaInfoExtractOptions_EnableDolbyVisionProfileTagging_Tag_dual_layer_Dolby_Vision_as_Profile_7", typeof(Resources))]
         [DescriptionL("MediaInfoExtractOptions_EnableDolbyVisionProfileTagging_Marks_the_1080p_enhancement_layer_as_Profile_7_6__Keep_ON_unless_your_player_mishandles_it_", typeof(Resources))]
+        [EnabledCondition(nameof(EnableHdrTagging), SimpleCondition.IsTrue)]
         public bool EnableDolbyVisionProfileTagging { get; set; } = true;
 
         /// <summary>HDR Vivid：CUVA 动态元数据 → 画质标签显示 HDR Vivid。</summary>
         [DisplayNameL("MediaInfoExtractOptions_EnableHdrVividTagging_Show_HDR_Vivid_label", typeof(Resources))]
         [DescriptionL("MediaInfoExtractOptions_EnableHdrVividTagging_Detects_CUVA_dynamic_metadata_and_shows_the_video_range_label_as_HDR_Vivid_", typeof(Resources))]
+        [EnabledCondition(nameof(EnableHdrTagging), SimpleCondition.IsTrue)]
         public bool EnableHdrVividTagging { get; set; } = true;
 
         /// <summary>

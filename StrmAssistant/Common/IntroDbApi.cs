@@ -120,6 +120,8 @@ namespace StrmAssistant.Common
         private static readonly StringComparison PathComparison =
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
 
+        private const int MaxCacheEntries = 512;
+
         private readonly ConcurrentDictionary<string, (DateTime Expiry, SourceResult Data)> _cache =
             new ConcurrentDictionary<string, (DateTime, SourceResult)>();
 
@@ -200,6 +202,19 @@ namespace StrmAssistant.Common
             Interlocked.Exchange(ref _mixedCount, 0);
             Interlocked.Exchange(ref _rateLimitLogged, 0);
             _firstFailureLogged = false;
+        }
+
+        private void CacheResult(string url, SourceResult data)
+        {
+            _cache[url] = (DateTime.UtcNow + CacheDuration, data);
+            if (_cache.Count <= MaxCacheEntries) return;
+
+            foreach (var key in _cache.Where(p => p.Value.Expiry <= DateTime.UtcNow).Select(p => p.Key).ToArray())
+                _cache.TryRemove(key, out _);
+
+            if (_cache.Count <= MaxCacheEntries) return;
+            foreach (var key in _cache.OrderBy(p => p.Value.Expiry).Take(_cache.Count - MaxCacheEntries).Select(p => p.Key).ToArray())
+                _cache.TryRemove(key, out _);
         }
 
         /// <summary>
@@ -542,7 +557,7 @@ namespace StrmAssistant.Common
                     return null;
                 }
 
-                _cache[url] = (DateTime.UtcNow + CacheDuration, result);
+                CacheResult(url, result);
                 ResetSourceFailures(provider);
 
                 return result;
@@ -637,7 +652,7 @@ namespace StrmAssistant.Common
         /// <summary>该媒体/该集在源站没有提交：按无数据处理并做负缓存，避免短期内重复请求。</summary>
         private void HandleNoData(string provider, string url)
         {
-            _cache[url] = (DateTime.UtcNow + CacheDuration, null);
+            CacheResult(url, null);
             Interlocked.Increment(ref _noDataCount);
             ResetSourceFailures(provider);
             _logger.Debug("IntroDbScrape - {0} has no data for {1}", provider, url);

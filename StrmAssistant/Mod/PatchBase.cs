@@ -109,6 +109,7 @@ namespace StrmAssistant.Mod
         public void Patch()
         {
             if (PatchTracker.Status == PatchStatus.Failed) return;
+            PatchTracker.IsFeatureEnabled = true;
 
             if (PatchTracker.FallbackPatchApproach == PatchApproach.None || PatchTracker.MissingTargets.Count > 0)
             {
@@ -163,6 +164,7 @@ namespace StrmAssistant.Mod
             }
 
             Prepare(false);
+            PatchTracker.IsFeatureEnabled = false;
             PatchTracker.Status = PatchStatus.NotInitialized;
         }
     }

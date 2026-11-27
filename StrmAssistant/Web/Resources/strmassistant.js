@@ -100,11 +100,14 @@ define([
 
             const bar = document.createElement('div');
             bar.className = 'sa-stale-hint';
-            bar.textContent = '服务器已重启或插件已更新，当前页面状态已失效，请刷新页面（Ctrl+F5）后重试。';
+            const locale = globalize.getCurrentLocale().toLowerCase();
+            bar.textContent = locale === 'zh-cn' ? '页面状态已失效，请刷新后重试。' :
+                (['zh-hk', 'zh-tw'].includes(locale) ? '頁面狀態已失效，請重新整理後重試。' :
+                    'The page state is no longer valid. Refresh and try again.');
             bar.setAttribute('style', 'position:fixed;top:0;left:0;right:0;z-index:99999;' +
                 'background:#b3261e;color:#fff;font-size:13px;padding:8px 12px;text-align:center;' +
                 'box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer;');
-            bar.title = '点击刷新页面';
+            bar.title = globalize.translate('Refresh');
             bar.addEventListener('click', function () { location.reload(); });
             document.body.appendChild(bar);
 
@@ -122,13 +125,16 @@ define([
         window.__saOptionsSearchHooked = true;
 
         const CONTAINER_SELECTORS = ['.fieldset-field', '.inputContainer', '.emby-input-container'];
-        const PAGE_HINT = 'configurationpage';
 
         let box = null;
         let keyword = '';
+        let originalDisplays = new WeakMap();
 
         function isSettingsPage() {
-            return (location.hash || '').toLowerCase().indexOf(PAGE_HINT) >= 0;
+            const hash = (location.hash || '').toLowerCase();
+            if (hash.indexOf('configurationpage') < 0) return false;
+            const text = (document.body && document.body.innerText || '').toLowerCase();
+            return text.indexOf('strmassistant') >= 0 || text.indexOf('神医助手') >= 0 || text.indexOf('神醫助手') >= 0;
         }
 
         function optionContainers() {
@@ -144,14 +150,14 @@ define([
             if (!items.length) return 0;
 
             const q = (value || '').trim().toLowerCase();
+            if (!q) {
+                restoreDisplays();
+                return 0;
+            }
+
             let hits = 0;
-
             items.forEach(function (el) {
-                if (!q) {
-                    el.style.display = '';
-                    return;
-                }
-
+                if (!originalDisplays.has(el)) originalDisplays.set(el, el.style.display);
                 const match = (el.textContent || '').toLowerCase().indexOf(q) >= 0;
                 el.style.display = match ? '' : 'none';
                 if (match) hits++;
@@ -160,8 +166,13 @@ define([
             return hits;
         }
 
+        function restoreDisplays() {
+            for (const [el, display] of originalDisplays) el.style.display = display;
+            originalDisplays = new WeakMap();
+        }
+
         function removeBox() {
-            applyFilter('');
+            restoreDisplays();
             if (box && box.parentNode) box.parentNode.removeChild(box);
             box = null;
             keyword = '';
@@ -180,7 +191,7 @@ define([
 
             const input = document.createElement('input');
             input.type = 'search';
-            input.placeholder = '搜索设置项…';
+            input.placeholder = globalize.translate('Search');
             input.setAttribute('style', 'width:200px;background:transparent;border:none;' +
                 'outline:none;color:#fff;font-size:13px;');
             input.value = keyword;
@@ -191,12 +202,12 @@ define([
             input.addEventListener('input', function () {
                 keyword = input.value;
                 const hits = applyFilter(keyword);
-                hint.textContent = keyword ? hits + ' 项' : '';
+                hint.textContent = keyword ? hits + ' ' + globalize.translate('Items') : '';
             });
 
             const close = document.createElement('span');
             close.textContent = '×';
-            close.title = '关闭搜索';
+            close.title = globalize.translate('Close');
             close.setAttribute('style', 'cursor:pointer;color:rgba(255,255,255,.6);' +
                 'font-size:16px;line-height:1;');
             close.addEventListener('click', removeBox);

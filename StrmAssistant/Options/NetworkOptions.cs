@@ -87,8 +87,7 @@ namespace StrmAssistant
 
         public void Initialize()
         {
-            ProxyServerStatus.StatusText = string.Empty;
-            ShowProxyServerStatus = false;
+            ShowProxyServerStatus = EnableProxyServer && !string.IsNullOrWhiteSpace(ProxyServerUrl);
         }
     }
 }

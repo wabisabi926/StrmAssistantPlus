@@ -1227,7 +1227,7 @@
     <value>Also scrape movies; movie markers only add chapters and do not participate in skip. Default is OFF.</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Api_Key" xml:space="preserve">
-    <value>IntroDb API Key</value>
+    <value>introdb.app API Key</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Optional_TheIntroDB_API_key_sent_via_Bearer_auth_to_raise_the_daily_request_limit__Default_is_empty_" xml:space="preserve">
     <value>IntroDb (introdb.app) API key. Lookups use IMDb ID; leave empty for the public limit.</value>
@@ -2080,5 +2080,8 @@
   </data>
   <data name="ScheduledTask_Category_PluginUpdate" xml:space="preserve">
     <value>Plugin Update</value>
+  </data>
+  <data name="ExperienceEnhanceOptions_DryRunPreview" xml:space="preserve">
+    <value>Dry run: {0} group(s) would be split.</value>
   </data>
 </root>

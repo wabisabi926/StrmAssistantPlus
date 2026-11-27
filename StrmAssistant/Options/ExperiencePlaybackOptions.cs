@@ -1,4 +1,5 @@
 using Emby.Web.GenericEdit;
+using Emby.Web.GenericEdit.Common;
 using MediaBrowser.Model.Attributes;
 using MediaBrowser.Model.LocalizationAttributes;
 using StrmAssistant.Properties;
@@ -26,6 +27,7 @@ namespace StrmAssistant.Options
         [DescriptionL("ExperienceEnhanceOptions_AutoMarkWatchedThreshold_Playback_progress_percentage_of_current_episode_required_to_mark_previous_episodes_as_watched__5_to_100__Default_is_90_", typeof(Resources))]
         [VisibleCondition(nameof(EnableAutoMarkWatched), SimpleCondition.IsTrue)]
         [Required]
+        [MinValue(5), MaxValue(100)]
         public int AutoMarkWatchedThreshold { get; set; } = 90;
 
         [DisplayNameL("ExperienceEnhanceOptions_AutoMarkWatchedExcludeFavorites_Exclude_Favorite_Episodes", typeof(Resources))]

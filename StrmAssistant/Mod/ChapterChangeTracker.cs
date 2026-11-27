@@ -3,6 +3,7 @@ using MediaBrowser.Controller.Entities;
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Controller.Persistence;
 using MediaBrowser.Model.Entities;
+using StrmAssistant.Common;
 using StrmAssistant.Core;
 using System.Collections.Generic;
 using System.Reflection;
@@ -107,7 +108,8 @@ namespace StrmAssistant.Mod
 
             if (BypassItem.Value != 0 && BypassItem.Value == itemId) return;
 
-            _ = Plugin.MediaInfoApi.SerializeMediaInfo(itemId, null, true, "Save Chapters").ConfigureAwait(false);
+            _ = BackgroundTaskRunner.Run("MediaInfo.SerializeChapters",
+                () => Plugin.MediaInfoApi.SerializeMediaInfo(itemId, null, true, "Save Chapters"));
         }
 
         [HarmonyPostfix]
@@ -115,7 +117,8 @@ namespace StrmAssistant.Mod
         {
             if (BypassItem.Value != 0 && BypassItem.Value == itemId) return;
 
-            _ = Plugin.MediaInfoApi.SerializeMediaInfo(itemId, null, true, "Delete Chapters").ConfigureAwait(false);
+            _ = BackgroundTaskRunner.Run("MediaInfo.SerializeChapters",
+                () => Plugin.MediaInfoApi.SerializeMediaInfo(itemId, null, true, "Delete Chapters"));
         }
 
         [HarmonyPostfix]
@@ -123,8 +126,9 @@ namespace StrmAssistant.Mod
         {
             if (__runOriginal)
             {
-                _ = Plugin.MediaInfoApi.SerializeMediaInfo(episode.InternalId, null, true,
-                    "Zero Fingerprint Confidence").ConfigureAwait(false);
+                _ = BackgroundTaskRunner.Run("MediaInfo.SerializeChapters",
+                    () => Plugin.MediaInfoApi.SerializeMediaInfo(episode.InternalId, null, true,
+                        "Zero Fingerprint Confidence"));
             }
         }
     }

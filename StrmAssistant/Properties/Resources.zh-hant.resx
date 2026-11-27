@@ -339,7 +339,7 @@
     <value>劇集/混合庫；僅列出已開啟片頭偵測的庫；留空包含全部。</value>
   </data>
   <data name="MetadataEnhanceOptions_EnableAltMovieDbUrl" xml:space="preserve">
-    <value>使用替代 TMDB 配置</value>
+    <value>使用替代 TMDB 設定</value>
   </data>
   <data name="MetadataEnhanceOptions_EnhanceMovieDbPerson_Enhance_MovieDb_Person" xml:space="preserve">
     <value>TMDB 演職人員增強</value>
@@ -789,7 +789,7 @@
     <value>重設時覆蓋原生片頭片尾標記</value>
   </data>
   <data name="PluginOptions_IsHarmonyModFailed_Harmony_Mod_Failed" xml:space="preserve">
-    <value>魔改失敗，請啟用調試模式日誌，重新啟動後查看日誌排查問題。</value>
+    <value>魔改失敗，請啟用偵錯模式日誌，重新啟動後查看日誌排查問題。</value>
   </data>
   <data name="HidePersonOption_NoImage_NoImage" xml:space="preserve">
     <value>無頭像人員</value>
@@ -915,7 +915,7 @@
     <value>自動標記前幾集已看</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnableAutoMarkWatched_Automatically_mark_previous_episodes_as_watched_when_current_episode_reaches_the_progress_threshold__Default_is_OFF_" xml:space="preserve">
-    <value>當前集播放進度達到閾值時，自動標記同劇前幾集為已看。預設為關閉。</value>
+    <value>目前這集播放進度達到閾值時，自動標記同劇前幾集為已看。預設為關閉。</value>
   </data>
   <data name="ExperienceEnhanceOptions_EnableMultiVersionEnhance_Multi_Version_Quality_Badges" xml:space="preserve">
     <value>多版本畫質標識</value>
@@ -1140,7 +1140,7 @@
     <value>同時刮削電影；僅寫章節標記，不參與跳過。預設關閉。</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Api_Key" xml:space="preserve">
-    <value>IntroDb API Key</value>
+    <value>introdb.app API Key</value>
   </data>
   <data name="IntroSkipOptions_IntroDbApiKey_Optional_TheIntroDB_API_key_sent_via_Bearer_auth_to_raise_the_daily_request_limit__Default_is_empty_" xml:space="preserve">
     <value>introdb.app 的 Key，按 IMDb ID 查詢；留空使用公共限額。</value>
@@ -1620,7 +1620,7 @@
     <value>代理、直連與 TMDB 介面。</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
-    <value>清除季映射</value>
+    <value>清除季對應</value>
   </data>
   <data name="ExperienceEnhanceOptions_Group_MultipleVersions" xml:space="preserve">
     <value>多版本</value>
@@ -1993,5 +1993,8 @@
   </data>
   <data name="ScheduledTask_Category_PluginUpdate" xml:space="preserve">
     <value>外掛更新</value>
+  </data>
+  <data name="ExperienceEnhanceOptions_DryRunPreview" xml:space="preserve">
+    <value>演練：將拆分 {0} 組</value>
   </data>
 </root>

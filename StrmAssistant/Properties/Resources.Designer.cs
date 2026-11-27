@@ -6066,5 +6066,14 @@ namespace StrmAssistant.Properties {
             }
         }
 
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ExperienceEnhanceOptions_DryRunPreview {
+            get {
+                return ResourceManager.GetString("ExperienceEnhanceOptions_DryRunPreview", resourceCulture);
+            }
+        }
+
     }
 }
