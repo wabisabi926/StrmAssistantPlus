@@ -8,7 +8,7 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 775/775 通过；Release 构建 0 警告 0 错误。
+- 单测 780/780 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护；4.11 外挂字幕扫描与合集自动建库拦截恢复。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
@@ -18,8 +18,8 @@
 - `UnlockIntroSkip` STRM 修复通过：真实片头样本两集均被原生任务选中；合成片尾样本的普通 MP4、本地 STRM 与本机 Range STRM 均写入 `CreditsStart` 标记。
 - 真实片尾内容验收通过：隔离 4.11 层级库使用《隐秘而伟大》S01E08/E15 真实 1080p H264 STRM，原生 `Detect Credits` 2 分 20 秒完成，分别写入 `CreditsStart=43:07.648` 与 `43:01.056`，均距片尾约 2 分 24 秒；条目 API 返回 `MarkerType=CreditsStart`，FullRefresh 后标记保留。Edge 播放器视觉验收通过，在 `CreditsStart` 处显示“继续观看 / 下一集”覆盖层。
 - 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库、最终字幕/合集验收小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余数个被 Windows 句柄锁住的空缓存目录，无数据库、配置或媒体残留。
-- 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复、合集自动建库拦截，以及本轮安全修复、普通刷新标记保护、真实片尾验收和 TheIntroDB mapping 均已推送；`main` 指向 `383d532`。未升版本、未打 tag、未发版。
-- 最终候选 DLL SHA-256 `344e1e5365de766565aad4293b02bdc72e739ad9a4ab076e004785e28a633f9f` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
+- 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复、合集自动建库拦截，以及本轮安全修复、普通刷新标记保护、真实片尾验收和 TheIntroDB mapping 均已推送到 `main`。未升版本、未打 tag、未发版。
+- 最终候选 DLL SHA-256 `7a0681bebc48a653c770406ecb50b2738fbb5b48359b6bd98a062a6ad7fa9f44` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ TheIntroDB v4 mapping 集序转换已完成（2026-11-27）
@@ -28,10 +28,10 @@
 - 4.11 优先读取 `Series.SeriesOrder`（`fileorder` ProviderId，如 `Tvdb-2_dvd`），旧版本回退 `Series.DisplayOrder`。
 - 已有 `tvdb_episode_id` 精确锁定的单集不传 mapping；TMDB/IMDb 路径保持原行为。
 - 服务端返回 400 时去掉 mapping 重试一次，仍失败则按原失败分类处理。
-- 新增 29 项 mapping 测试，全量 **775/775** 通过；最终候选 DLL SHA-256 `a6694f756c5390750647b9f6e90ea9c846a35ca6e9bc22a9f1167d0f62fc2102`。
+- 新增 29 项 mapping 测试，全量 **780/780** 通过；最终候选 DLL SHA-256 `7a0681bebc48a653c770406ecb50b2738fbb5b48359b6bd98a062a6ad7fa9f44`。
 - 隔离 4.11 库内容级对照通过：《三国演义》absolute 与 official 均写入 03:00；《笑傲江湖》DVD 返回 400 并回退 official，均写入 01:30。mapping 轮 6 次请求、无 mapping 基线 4 次请求，两轮 8 条 `#DB` 标记摘要完全一致。
-- 4.10 候选启动 `Healthy`，验证旧 `DisplayOrder` 回退路径；验收后两套实例已恢复 `344e1e53…` 原 DLL 与原配置。
-- 真实样本扫描：本地 248 部 TVDB 剧集 S01E01、6 部多 mapping 候选剧全季 288 集，以及 The Simpsons S01E01-E13，均未发现 official/dvd/absolute 返回不同标记内容；因此“集序差异改变标记内容”仍未证实。
+- 4.10 候选启动 `Healthy`，验证旧 `DisplayOrder` 回退路径；最终候选已部署到两套实例并恢复原刮削范围。
+- 本地 248 部 TVDB 剧中 51 部有提交，但无一部同时具备可用 DVD/absolute 集序；改用 TheIntroDB 覆盖率与 TVDB 集序代理反向筛选，找到真实样本 **The Office US（TVDB 73244）S04E09**。自建虚拟库端到端验收：DVD 只写 `CreditsStart=21:39.817`；official 写 `IntroStart=02:35.004`、`IntroEnd=03:04.004`、`CreditsStart=21:30.864`，证明 mapping 会改变实际落库内容。
 - 播放器视觉：Edge 播放《隐秘而伟大》S01E08 真实 1080p H264 STRM，在临时 `CreditsStart=43:07.648` 处显示“继续观看 / 下一集”片尾覆盖层；临时标记已删除。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
