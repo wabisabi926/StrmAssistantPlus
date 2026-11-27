@@ -47,26 +47,26 @@ namespace StrmAssistant.Web.Service
             }
             
             var user = GetUserForRequest(null);
-            var collectionFolders = _libraryManager.GetCollectionFolders(item);
 
-            if (user is null)
+            bool CanDeleteItem(BaseItem target)
             {
-                if (!item.CanDelete())
-                {
-                    return;
-                }
+                var folders = _libraryManager.GetCollectionFolders(target);
+                return user == null ? target.CanDelete() : target.CanDelete(user, folders);
             }
-            else if (!item.CanDelete(user, collectionFolders))
+
+            var candidates = item is Episode episode && request.DeleteParent
+                ? GetSeasonEpisodesSameVersion(episode)
+                : new List<BaseItem> { item };
+            var deletePlan = VersionDeletePlanner.Build(item, candidates, CanDeleteItem);
+            if (deletePlan.IsDenied || deletePlan.UnauthorizedCount > 0)
             {
+                _logger.Info("DeleteVersion - delete plan rejected because one or more items are not authorized");
                 return;
             }
 
+            var deleteItems = deletePlan.Authorized.ToList();
             var enableDeepDelete = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Playback.EnableDeepDelete;
             var enableNotification = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Notification.EnhanceNotificationSystem;
-
-            var deleteItems = item is Episode episode && request.DeleteParent
-                ? GetSeasonEpisodesSameVersion(episode)
-                : new List<BaseItem> { item };
 
             if (DryRunMode.Skip($"delete {deleteItems.Count} version item(s)", _logger)) return;
 
@@ -109,7 +109,7 @@ namespace StrmAssistant.Web.Service
 
                     try
                     {
-                        _fileSystem.DeleteDirectory(item.GetInternalMetadataPath(), true, true);
+                        _fileSystem.DeleteDirectory(deleteItem.GetInternalMetadataPath(), true, true);
                     }
                     catch
                     {
@@ -147,64 +147,52 @@ namespace StrmAssistant.Web.Service
         {
             var result = new DeleteVersionPreviewResult
             {
-                ItemId = request?.Id,
                 DeleteParent = request?.DeleteParent ?? false
             };
 
             if (!Plugin.IsPluginEnabled)
             {
-                result.Message = "插件未启用";
+                result.Message = "Plugin is disabled";
                 return result;
             }
 
             var item = _libraryManager.GetItemById(request.Id);
-
-            if (!(item is Episode episode))
+            if (!(item is Video video) || !(video is Movie || video is Episode) || !video.IsFileProtocol ||
+                video.GetAlternateVersionIds().Count == 0)
             {
-                result.Message = "仅支持对单集预览";
-                return result;
-            }
-
-            if (!request.DeleteParent)
-            {
-                result.Message = "DeleteParent=false：只会删除该单集本身";
-                result.WillDelete.Add(new DeleteVersionPreviewEntry
-                {
-                    Id = episode.Id.ToString(),
-                    Name = episode.Name,
-                    Path = episode.Path
-                });
+                result.Message = "Only movies and episodes with alternate versions are supported";
                 return result;
             }
 
             var user = GetUserForRequest(null);
-            var collectionFolders = _libraryManager.GetCollectionFolders(item);
-
-            if (user is null)
+            bool CanDeleteItem(BaseItem target)
             {
-                if (!item.CanDelete())
-                {
-                    result.Message = "无删除权限";
-                    return result;
-                }
+                var folders = _libraryManager.GetCollectionFolders(target);
+                return user == null ? target.CanDelete() : target.CanDelete(user, folders);
             }
-            else if (!item.CanDelete(user, collectionFolders))
+
+            var candidates = request.DeleteParent && item is Episode episode
+                ? GetSeasonEpisodesSameVersion(episode, result.Skipped)
+                : new List<BaseItem> { item };
+            var deletePlan = VersionDeletePlanner.Build(item, candidates, CanDeleteItem);
+            if (deletePlan.IsDenied)
             {
-                result.Message = "无删除权限";
+                result.Message = "No delete permission";
                 return result;
             }
 
-            foreach (var target in GetSeasonEpisodesSameVersion(episode, result.Skipped))
+            result.ItemId = item.Id.ToString();
+            foreach (var target in deletePlan.Authorized)
             {
                 result.WillDelete.Add(new DeleteVersionPreviewEntry
                 {
                     Id = target.Id.ToString(),
-                    Name = target.Name,
-                    Path = target.Path
+                    Name = target.Name
                 });
             }
 
-            result.Message = $"将删除 {result.WillDelete.Count} 个条目，跳过 {result.Skipped.Count} 个候选";
+            result.SkippedCount = result.Skipped.Count + deletePlan.UnauthorizedCount;
+            result.Message = $"Will delete {result.WillDelete.Count} item(s); skipped {result.SkippedCount} candidate(s)";
             return result;
         }
 
@@ -259,9 +247,6 @@ namespace StrmAssistant.Web.Service
 
                     skipped?.Add(new DeleteVersionPreviewEntry
                     {
-                        Id = ep.Id.ToString(),
-                        Name = ep.Name,
-                        Path = ep.Path,
                         Reason = reason
                     });
 
@@ -283,6 +268,7 @@ namespace StrmAssistant.Web.Service
         public string Message { get; set; }
         public List<DeleteVersionPreviewEntry> WillDelete { get; set; } = new List<DeleteVersionPreviewEntry>();
         public List<DeleteVersionPreviewEntry> Skipped { get; set; } = new List<DeleteVersionPreviewEntry>();
+        public int SkippedCount { get; set; }
     }
 
     /// <summary>预览中的单个条目；<see cref="Reason"/> 仅在被跳过时有值。</summary>
@@ -290,7 +276,6 @@ namespace StrmAssistant.Web.Service
     {
         public string Id { get; set; }
         public string Name { get; set; }
-        public string Path { get; set; }
         public string Reason { get; set; }
     }
 

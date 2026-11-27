@@ -372,22 +372,55 @@ define([
             function deleteVersion(itemId, deleteParent = false) {
                 loading.show();
                 let apiClient = connectionManager.currentApiClient();
-                let deleteApi = apiClient.getUrl(`Items/${itemId}/DeleteVersion${deleteParent ? `?DeleteParent=true` : ''}`);
+                let previewApi = apiClient.getUrl(`Items/${itemId}/DeleteVersionPreview${deleteParent ? `?DeleteParent=true` : ''}`);
                 apiClient.ajax({
-                    type: "POST",
-                    url: deleteApi,
-                    data: {},
-                    contentType: "application/json"
-                }).then(() => {
+                    type: 'GET',
+                    url: previewApi
+                }).then(function(preview) {
                     loading.hide();
+                    if (!preview || !preview.WillDelete || preview.WillDelete.length === 0) {
+                        toastOperationFailed();
+                        return;
+                    }
+
                     const locale = globalize.getCurrentLocale().toLowerCase();
-                    const confirmMessage = (locale === 'zh-cn') ? '\u5220\u9664\u7248\u672c\u6210\u529f' :
-                        (['zh-hk', 'zh-tw'].includes(locale) ? '\u524a\u9664\u7248\u672c\u6210\u529f' : 'Delete Version Success');
-                    toast(confirmMessage);
-                }).catch(() => {
+                    const skipped = preview.SkippedCount || 0;
+                    const summary = locale === 'zh-cn'
+                        ? `将删除 ${preview.WillDelete.length} 个条目${skipped ? `，跳过 ${skipped} 个候选` : ''}。`
+                        : (['zh-hk', 'zh-tw'].includes(locale)
+                            ? `將刪除 ${preview.WillDelete.length} 個項目${skipped ? `，略過 ${skipped} 個候選` : ''}。`
+                            : `Delete ${preview.WillDelete.length} item(s)${skipped ? `, skip ${skipped} candidate(s)` : ''}.`);
+                    return confirm({
+                        text: summary + "\n\n" + globalize.translate('AreYouSureToContinue'),
+                        title: globalize.translate('HeaderDeleteItem'),
+                        confirmText: globalize.translate('Delete'),
+                        primary: 'cancel',
+                        centerText: !1
+                    }).then(postDelete);
+                }).catch(function() {
                     loading.hide();
                     toastOperationFailed();
                 });
+
+                function postDelete() {
+                    loading.show();
+                    let deleteApi = apiClient.getUrl(`Items/${itemId}/DeleteVersion${deleteParent ? `?DeleteParent=true` : ''}`);
+                    apiClient.ajax({
+                        type: "POST",
+                        url: deleteApi,
+                        data: {},
+                        contentType: "application/json"
+                    }).then(() => {
+                        loading.hide();
+                        const locale = globalize.getCurrentLocale().toLowerCase();
+                        const confirmMessage = (locale === 'zh-cn') ? '\u5220\u9664\u7248\u672c\u6210\u529f' :
+                            (['zh-hk', 'zh-tw'].includes(locale) ? '\u524a\u9664\u7248\u672c\u6210\u529f' : 'Delete Version Success');
+                        toast(confirmMessage);
+                    }).catch(() => {
+                        loading.hide();
+                        toastOperationFailed();
+                    });
+                }
             }
         },
 
