@@ -315,7 +315,7 @@
 - **替代实现**：批量 DTO 改走模型 setter；片头检测改走原生 MarkerDetector；发现地址改走序列化 hook；截图增加直接抽帧兜底。
 - **当前不可用**：插件自建指纹任务、剧集通知摘要、`-skip_frame` 关键帧优化。
 - **受限**：ExclusiveExtract 默认关闭，4.11 仅保留受限模式；中文搜索的纯数字/Provider ID 增强未启用；不再提供全局 `SaveChapters` 保护 hook；深度删除只处理本地目标且不清理空目录。
-- **尚未验证**：真实多 m2ts 本地 ISO、弱网采样自适应、ARM64 NAS 与播放器 Skip Credits 视觉；真实 STRM 片头和片尾内容检测已通过，ISO 与弱网回退已有本地验收。4.9 不再作为适配目标，BDMV 不在支持范围内。
+- **尚未验证**：真实多 m2ts 本地 ISO、弱网采样自适应、ARM64 NAS；播放器片尾视觉已通过，Edge 在 `CreditsStart` 处显示“继续观看 / 下一集”覆盖层。真实 STRM 片头和片尾内容检测已通过，ISO 与弱网回退已有本地验收。4.9 不再作为适配目标，BDMV 不在支持范围内。
 
 > ISO 提取：Emby 的第三方 `IsoMounter` 插件与 4.10 不兼容，会阻塞 ISO 探测，请禁用或移除；本插件不依赖它。Linux/Docker 下本地 ISO 无需挂载，Windows 挂载失败时也会回退正片采样。
 
