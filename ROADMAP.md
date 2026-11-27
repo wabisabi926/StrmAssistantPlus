@@ -18,7 +18,7 @@
 - `UnlockIntroSkip` STRM 修复通过：真实片头样本两集均被原生任务选中；合成片尾样本的普通 MP4、本地 STRM 与本机 Range STRM 均写入 `CreditsStart` 标记。
 - 真实片尾内容验收通过：隔离 4.11 层级库使用《隐秘而伟大》S01E08/E15 真实 1080p H264 STRM，原生 `Detect Credits` 2 分 20 秒完成，分别写入 `CreditsStart=43:07.648` 与 `43:01.056`，均距片尾约 2 分 24 秒；条目 API 返回 `MarkerType=CreditsStart`，FullRefresh 后标记保留。播放器视觉验收因 4K 样本缓冲未完成，未计入通过。
 - 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库、最终字幕/合集验收小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余数个被 Windows 句柄锁住的空缓存目录，无数据库、配置或媒体残留。
-- 截至 `f80c3d8` 的 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复与合集自动建库拦截已推送；本轮安全修复、普通刷新标记保护与真实片尾验收尚未提交，`main` 仍指向 `f80c3d8`。未升版本、未打 tag、未发版。
+- 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复、合集自动建库拦截，以及本轮安全修复、普通刷新标记保护和真实片尾验收均已推送；`main` 指向 `e07b9ff`。未升版本、未打 tag、未发版。
 - 最终候选 DLL SHA-256 `344e1e5365de766565aad4293b02bdc72e739ad9a4ab076e004785e28a633f9f` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
