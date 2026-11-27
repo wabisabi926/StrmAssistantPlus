@@ -15,6 +15,7 @@ namespace StrmAssistant.Core
     {
         private static readonly object Lock = new object();
         private static Timer _timer;
+        private static CancellationTokenSource _shutdownCts;
         private static ILogger _logger;
         private static int _thresholdMb;
         private static int _overLimitCount;
@@ -40,6 +41,7 @@ namespace StrmAssistant.Core
 
                 if (_timer != null) return;
 
+                _shutdownCts = new CancellationTokenSource();
                 _overLimitCount = 0;
                 _timer = new Timer(Check, null, CheckInterval, CheckInterval);
                 logger?.Info($"MemoryGuard - Started, threshold {thresholdMb} MB, " +
@@ -68,7 +70,11 @@ namespace StrmAssistant.Core
         {
             _timer?.Dispose();
             _timer = null;
+            _shutdownCts?.Cancel();
+            _shutdownCts?.Dispose();
+            _shutdownCts = null;
             _overLimitCount = 0;
+            _restarting = false;
             _restartAtUtc = null;
         }
 
@@ -108,7 +114,8 @@ namespace StrmAssistant.Core
                             string.Format(message ?? string.Empty,
                                 workingSetMb, _thresholdMb, RestartCountdownSeconds), 15000);
 
-                        await Task.Delay(TimeSpan.FromSeconds(RestartCountdownSeconds)).ConfigureAwait(false);
+                        await Task.Delay(TimeSpan.FromSeconds(RestartCountdownSeconds),
+                            _shutdownCts?.Token ?? CancellationToken.None).ConfigureAwait(false);
 
                         if (!Plugin.Instance.MainOptionsStore.GetOptions().Memory.EnableMemoryAutoRestart)
                         {
@@ -120,6 +127,12 @@ namespace StrmAssistant.Core
                         }
 
                         Plugin.Instance.ApplicationHost.Restart();
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        _restarting = false;
+                        _restartAtUtc = null;
+                        _overLimitCount = 0;
                     }
                     catch (Exception e)
                     {

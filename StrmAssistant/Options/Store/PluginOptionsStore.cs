@@ -44,6 +44,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is PluginOptions options)
             {
+                if (!RuntimeActive) return;
                 var suppress = _currentSuppressOnOptionsSaved;
 
                 if (string.IsNullOrEmpty(options.TaskConcurrency.CatchupTaskScope))

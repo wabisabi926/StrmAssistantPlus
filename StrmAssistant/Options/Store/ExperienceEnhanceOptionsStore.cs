@@ -39,6 +39,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is ExperienceEnhanceOptions options)
             {
+                if (!RuntimeActive) return;
                 if (string.IsNullOrEmpty(options.ItemDisplay.HidePersonPreference))
                 {
                     options.ItemDisplay.HidePersonPreference = HidePersonOption.NoImage.ToString();

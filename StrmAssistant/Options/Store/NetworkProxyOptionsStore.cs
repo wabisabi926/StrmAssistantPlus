@@ -38,6 +38,7 @@ namespace StrmAssistant.Options.Store
         private void OnFileSaving(object sender, FileSavingEventArgs e)
         {
             if (!(e.Options is NetworkProxyOptions options)) return;
+            if (!RuntimeActive) return;
 
             var network = options.Network;
             var tmdb = options.TmdbReplacement;

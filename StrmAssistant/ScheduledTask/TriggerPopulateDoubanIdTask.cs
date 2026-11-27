@@ -14,6 +14,12 @@ namespace StrmAssistant.ScheduledTask
     {
         public Task Run(IProgress<double> progress, CancellationToken cancellationToken)
         {
+            if (!Plugin.IsPluginEnabled || Plugin.IsShuttingDown ||
+                Plugin.Instance.MetadataEnhanceStore == null || Plugin.DoubanAssist == null)
+            {
+                return Task.CompletedTask;
+            }
+
             if (!Plugin.Instance.MetadataEnhanceStore.GetOptions().IsDoubanDataEnabled)
             {
                 return Task.CompletedTask;

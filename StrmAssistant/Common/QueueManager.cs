@@ -938,23 +938,34 @@ namespace StrmAssistant.Common
             }
         }
 
-        public static void Dispose()
+        public static async Task ShutdownAsync(TimeSpan timeout)
         {
             MediaInfoTokenSource?.Cancel();
-            MediaInfoTokenSource?.Dispose();
-            MediaInfoTokenSource = null;
-
             IntroSkipTokenSource?.Cancel();
-            IntroSkipTokenSource?.Dispose();
-            IntroSkipTokenSource = null;
-
             FingerprintTokenSource?.Cancel();
-            FingerprintTokenSource?.Dispose();
-            FingerprintTokenSource = null;
-
             EpisodeRefreshTokenSource?.Cancel();
+
+            var tasks = new[] { MediaInfoProcessTask, FingerprintProcessTask, EpisodeRefreshProcessTask }
+                .Where(t => t != null)
+                .ToArray();
+            if (tasks.Length > 0)
+            {
+                await Task.WhenAny(Task.WhenAll(tasks), Task.Delay(timeout)).ConfigureAwait(false);
+            }
+
+            MediaInfoTokenSource?.Dispose();
+            IntroSkipTokenSource?.Dispose();
+            FingerprintTokenSource?.Dispose();
             EpisodeRefreshTokenSource?.Dispose();
+            MediaInfoTokenSource = null;
+            IntroSkipTokenSource = null;
+            FingerprintTokenSource = null;
             EpisodeRefreshTokenSource = null;
+        }
+
+        public static void Dispose()
+        {
+            ShutdownAsync(TimeSpan.FromSeconds(5)).GetAwaiter().GetResult();
         }
     }
 }

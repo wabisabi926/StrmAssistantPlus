@@ -71,6 +71,10 @@ namespace StrmAssistant
         public static bool IsPluginEnabled =>
             Instance?.MainOptionsStore?.GetOptions()?.EnablePlugin ?? true;
 
+        public static bool IsShuttingDown { get; private set; }
+
+        private bool _eventsSubscribed;
+
         public static LibraryApi LibraryApi { get; private set; }
         public static MediaInfoApi MediaInfoApi { get; private set; }
         public static ChapterApi ChapterApi { get; private set; }
@@ -121,6 +125,9 @@ namespace StrmAssistant
             IImageExtractionManager imageExtractionManager, IServerApplicationPaths serverApplicationPaths)
         {
             Instance = this;
+            IsShuttingDown = false;
+            _eventsSubscribed = false;
+            BackgroundTaskRunner.Reset();
             Logger = logManager.GetLogger(Name);
             Logger.Info("Plugin is getting loaded.");
             ApplicationHost = applicationHost;
@@ -411,10 +418,12 @@ namespace StrmAssistant
             _userManager.UserConfigurationUpdated += OnUserConfigurationUpdated;
             _userDataManager.UserDataSaved += OnUserDataSaved;
             CollectionFolder.LibraryOptionsUpdated += OnLibraryOptionsUpdated;
+            _eventsSubscribed = true;
         }
 
                 private void OnRefreshCompleted(object sender, GenericEventArgs<RefreshProgressInfo> e)
         {
+            if (IsShuttingDown) return;
             if (_libraryManager.IsScanRunning) return;
 
             var options = ExperienceEnhanceStore.GetOptions();
@@ -520,21 +529,25 @@ namespace StrmAssistant
 
         private void OnUserCreated(object sender, GenericEventArgs<User> e)
         {
+            if (IsShuttingDown) return;
             LibraryApi.FetchUsers();
         }
 
         private void OnUserDeleted(object sender, GenericEventArgs<User> e)
         {
+            if (IsShuttingDown) return;
             LibraryApi.FetchUsers();
         }
 
         private void OnUserConfigurationUpdated(object sender, GenericEventArgs<User> e)
         {
+            if (IsShuttingDown) return;
             if (e.Argument.Policy.IsAdministrator) LibraryApi.FetchAdminOrderedViews();
         }
 
         private void OnLibraryOptionsUpdated(object sender, GenericEventArgs<Tuple<CollectionFolder, LibraryOptions>> e)
         {
+            if (IsShuttingDown) return;
             var library = e.Argument.Item1;
 
             if (!LibraryApi.ExcludedCollectionTypes.Contains(library.CollectionType))
@@ -558,6 +571,7 @@ namespace StrmAssistant
 
         private async void OnItemAdded(object sender, ItemChangeEventArgs e)
         {
+            if (IsShuttingDown) return;
             try
             {
                 // 合集变更通知：条目加入合集
@@ -644,6 +658,7 @@ namespace StrmAssistant
         /// </summary>
         private void OnPlaybackStart(object sender, PlaybackProgressEventArgs e)
         {
+            if (IsShuttingDown) return;
             if (MetadataEnhanceStore.GetOptions().IsDoubanDataEnabled &&
                 (e.Item is Movie || e.Item is Episode || e.Item is Series || e.Item is Season))
             {
@@ -656,6 +671,7 @@ namespace StrmAssistant
 
         private void OnPlaybackStopped(object sender, PlaybackProgressEventArgs e)
         {
+            if (IsShuttingDown) return;
             if (e.Item is Video && MediaInfoExtractStore.MediaInfoExtractOptions.ExtractionPerformance.ExclusiveExtract &&
                 IsExclusiveFeatureSelected(ExclusiveControl.ExtractAlternative))
             {
@@ -672,6 +688,7 @@ namespace StrmAssistant
 
         private void OnItemUpdated(object sender, ItemChangeEventArgs e)
         {
+            if (IsShuttingDown) return;
             // 标记写入后的内部条目更新只用于通知客户端，不触发插件的元数据更新通知
             if (IntroMarkerNotifier.IsMarkerUpdate) return;
 
@@ -759,6 +776,7 @@ namespace StrmAssistant
 
         private void OnItemRemoved(object sender, ItemChangeEventArgs e)
         {
+            if (IsShuttingDown) return;
             // 合集变更通知：条目移出合集
             if (ExperienceEnhanceStore.GetOptions().Notification.EnhanceNotificationSystem &&
                 (e.Parent ?? e.Item?.Parent) is BoxSet boxsetRemoved)
@@ -799,6 +817,7 @@ namespace StrmAssistant
 
         private void OnUserDataSaved(object sender, UserDataSaveEventArgs e)
         {
+            if (IsShuttingDown) return;
             if (e.UserData.IsFavorite)
             {
                 if (MainOptionsStore.PluginOptions.TaskConcurrency.CatchupMode &&
@@ -815,16 +834,74 @@ namespace StrmAssistant
             }
         }
 
-        public override void OnUninstalling()
+        private void UnsubscribeEvents()
         {
-            if (MainOptionsStore.GetOptions().ChineseSearch.EnhanceChineseSearch)
+            if (!_eventsSubscribed) return;
+            _libraryManager.ItemAdded -= OnItemAdded;
+            _libraryManager.ItemUpdated -= OnItemUpdated;
+            _libraryManager.ItemRemoved -= OnItemRemoved;
+            _providerManager.RefreshCompleted -= OnRefreshCompleted;
+            _sessionManager.PlaybackStart -= OnPlaybackStart;
+            _sessionManager.PlaybackStopped -= OnPlaybackStopped;
+            _userManager.UserCreated -= OnUserCreated;
+            _userManager.UserDeleted -= OnUserDeleted;
+            _userManager.UserConfigurationUpdated -= OnUserConfigurationUpdated;
+            _userDataManager.UserDataSaved -= OnUserDataSaved;
+            CollectionFolder.LibraryOptionsUpdated -= OnLibraryOptionsUpdated;
+            _eventsSubscribed = false;
+        }
+
+        public async Task ShutdownAsync(TimeSpan timeout)
+        {
+            if (IsShuttingDown) return;
+            IsShuttingDown = true;
+            BackgroundTaskRunner.BeginShutdown();
+            UnsubscribeEvents();
+
+            try
             {
-                _ = NotificationApi.SendMessageToAdmins(
-                    $"[{Resources.PluginOptions_EditorTitle_Strm_Assistant}] {Resources.Uninstall_Warning}", 10000);
+                await QueueManager.ShutdownAsync(timeout).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Queue shutdown failed: {ex.Message}");
             }
 
+            try
+            {
+                await BackgroundTaskRunner.ShutdownAsync(timeout).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Logger.Warn($"Background task shutdown failed: {ex.Message}");
+            }
+
+            MemoryGuard.Stop();
             MemoryCleaner.DisposeInstance();
+            PerformanceReporter.DisposeInstance();
+            PatchManager.Shutdown();
             Common.IsoMounter.DismountAll();
+        }
+
+        public override void OnUninstalling()
+        {
+            if (!IsShuttingDown)
+            {
+                if (MainOptionsStore.GetOptions().ChineseSearch.EnhanceChineseSearch && NotificationApi != null)
+                {
+                    _ = NotificationApi.SendMessageToAdmins(
+                        $"[{Resources.PluginOptions_EditorTitle_Strm_Assistant}] {Resources.Uninstall_Warning}", 10000);
+                }
+
+                try
+                {
+                    ShutdownAsync(TimeSpan.FromSeconds(10)).GetAwaiter().GetResult();
+                }
+                catch (Exception ex)
+                {
+                    Logger.Warn($"Plugin shutdown failed: {ex.Message}");
+                }
+            }
 
             base.OnUninstalling();
         }

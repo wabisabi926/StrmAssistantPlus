@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -18,6 +20,10 @@ namespace StrmAssistant.Common
     {
         private static readonly ConcurrentDictionary<long, string> Running =
             new ConcurrentDictionary<long, string>();
+        private static readonly ConcurrentDictionary<long, Task> Tasks =
+            new ConcurrentDictionary<long, Task>();
+        private static readonly object LifecycleLock = new object();
+        private static int _acceptingTasks = 1;
 
         private static long _sequence;
 
@@ -29,35 +35,76 @@ namespace StrmAssistant.Common
             if (body == null) return Task.CompletedTask;
 
             var id = Interlocked.Increment(ref _sequence);
-            Running[id] = name ?? "unnamed";
-
-            return Task.Run(async () =>
+            Task task;
+            lock (LifecycleLock)
             {
-                try
-                {
-                    await body().ConfigureAwait(false);
-                }
-                catch (OperationCanceledException)
-                {
-                    // 主动取消属正常路径，不记为错误
-                }
-                catch (Exception e)
+                if (_acceptingTasks == 0) return Task.CompletedTask;
+                Running[id] = name ?? "unnamed";
+                task = Task.Run(async () =>
                 {
                     try
                     {
-                        Plugin.Instance?.Logger?.Error($"BackgroundTask - {name} failed: {e.Message}");
-                        Plugin.Instance?.Logger?.Debug(e.StackTrace);
+                        await body().ConfigureAwait(false);
                     }
-                    catch
+                    catch (OperationCanceledException)
                     {
-                        // 日志本身失败时不能再抛，否则会终结进程
+                        // 主动取消属正常路径，不记为错误
                     }
-                }
-                finally
-                {
-                    Running.TryRemove(id, out _);
-                }
-            });
+                    catch (Exception e)
+                    {
+                        try
+                        {
+                            Plugin.Instance?.Logger?.Error($"BackgroundTask - {name} failed: {e.Message}");
+                            Plugin.Instance?.Logger?.Debug(e.StackTrace);
+                        }
+                        catch
+                        {
+                            // 日志本身失败时不能再抛，否则会终结进程
+                        }
+                    }
+                    finally
+                    {
+                        Running.TryRemove(id, out _);
+                        Tasks.TryRemove(id, out _);
+                    }
+                });
+                Tasks[id] = task;
+            }
+
+            return task;
+        }
+
+        public static void Reset()
+        {
+            lock (LifecycleLock)
+            {
+                _acceptingTasks = 1;
+                Running.Clear();
+                Tasks.Clear();
+            }
+        }
+
+        public static void BeginShutdown()
+        {
+            lock (LifecycleLock)
+            {
+                _acceptingTasks = 0;
+            }
+        }
+
+        public static async Task<bool> ShutdownAsync(TimeSpan timeout)
+        {
+            BeginShutdown();
+            Task[] pending;
+            lock (LifecycleLock)
+            {
+                pending = Tasks.Values.ToArray();
+            }
+
+            if (pending.Length == 0) return true;
+            var all = Task.WhenAll(pending);
+            var completed = await Task.WhenAny(all, Task.Delay(timeout)).ConfigureAwait(false);
+            return completed == all;
         }
 
         public static Task Run(string name, Action body)

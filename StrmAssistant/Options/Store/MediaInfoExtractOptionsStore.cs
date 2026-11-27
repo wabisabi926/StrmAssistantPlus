@@ -32,6 +32,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is MediaInfoExtractOptions options)
             {
+                if (!RuntimeActive) return;
                 // 自定义 ffmpeg/ffprobe 路径保存期校验：不存在时立即告警，避免用户以为已生效
                 foreach (var (label, path) in new[]
                          {

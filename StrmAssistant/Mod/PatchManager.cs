@@ -197,6 +197,24 @@ namespace StrmAssistant.Mod
             }
         }
 
+        public static void Shutdown()
+        {
+            try
+            {
+                HarmonyMod?.UnpatchAll();
+            }
+            catch (Exception ex)
+            {
+                Plugin.Instance?.Logger?.Warn($"PatchManager shutdown failed: {ex.Message}");
+            }
+
+            HarmonyMod = null;
+            _isInitialized = false;
+            PatchTrackerList.Clear();
+            MethodInfoCache.Clear();
+            HarmonyMethodCache.Clear();
+        }
+
         public static bool IsPatched(MethodBase methodInfo, Type type)
         {
             var patchedMethods = Harmony.GetAllPatchedMethods();

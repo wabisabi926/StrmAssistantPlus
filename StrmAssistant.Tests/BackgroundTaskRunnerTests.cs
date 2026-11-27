@@ -41,6 +41,27 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public async Task Shutdown_StopsNewTasksAndWaitsForRunningTasks()
+        {
+            BackgroundTaskRunner.Reset();
+            var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var running = BackgroundTaskRunner.Run("test.shutdown.running", () => release.Task);
+            var ranAfterShutdown = false;
+
+            var early = await BackgroundTaskRunner.ShutdownAsync(TimeSpan.FromMilliseconds(50));
+            Assert.False(early);
+
+            await BackgroundTaskRunner.Run("test.shutdown.rejected", () => { ranAfterShutdown = true; });
+            Assert.False(ranAfterShutdown);
+
+            release.SetResult(true);
+            var drained = await BackgroundTaskRunner.ShutdownAsync(TimeSpan.FromSeconds(1));
+            await running;
+            Assert.True(drained);
+            BackgroundTaskRunner.Reset();
+        }
+
+        [Fact]
         public async Task RunsAsyncBody()
         {
             var value = 0;

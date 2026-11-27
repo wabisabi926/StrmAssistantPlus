@@ -31,6 +31,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is MetadataEnhanceOptions options)
             {
+                if (!RuntimeActive) return;
                 if (string.IsNullOrEmpty(options.ChineseMetadata.FallbackLanguages))
                 {
                     options.ChineseMetadata.FallbackLanguages = "zh-sg";

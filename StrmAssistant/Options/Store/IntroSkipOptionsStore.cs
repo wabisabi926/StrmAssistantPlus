@@ -56,6 +56,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is IntroSkipOptions options)
             {
+                if (!RuntimeActive) return;
                 options.Playback.LibraryScope = FilterScope(options.Playback.LibraryScope, options.Playback.LibraryList,
                     nameof(IntroSkipPlaybackOptions.LibraryScope));
 

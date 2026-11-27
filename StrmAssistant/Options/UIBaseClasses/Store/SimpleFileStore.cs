@@ -45,6 +45,8 @@
 
         public event EventHandler<FileSavedEventArgs> FileSaved;
 
+        protected bool RuntimeActive => Plugin.IsPluginEnabled && !Plugin.IsShuttingDown;
+
         public virtual string OptionsFileName { get; }
 
         public string OptionsFilePath => Path.Combine(this.pluginconfigPath, this.OptionsFileName);
@@ -126,7 +128,10 @@
             }
 
             var savedArgs = new FileSavedEventArgs(newOptions);
-            this.FileSaved?.Invoke(this, savedArgs);
+            if (RuntimeActive)
+            {
+                FileSaved?.Invoke(this, savedArgs);
+            }
         }
     }
 }
