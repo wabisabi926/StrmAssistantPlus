@@ -4,6 +4,7 @@
     using System.IO;
 
     using Emby.Web.GenericEdit;
+    using StrmAssistant.Common;
 
     using MediaBrowser.Common;
     using MediaBrowser.Common.Configuration;
@@ -22,6 +23,7 @@
         private readonly string pluginconfigPath;
 
         private TOptionType options;
+        private bool _loadFailed;
 
         public SimpleFileStore(IApplicationHost applicationHost, ILogger logger, string pluginFullName)
         {
@@ -68,34 +70,30 @@
         {
             lock (this.lockObj)
             {
-                var tempOptions = this.options ?? new TOptionType();
-
                 try
                 {
                     if (!this.fileSystem.FileExists(this.OptionsFilePath))
                     {
-                        // 首次安装或配置文件被删除时必须把默认实例缓存下来：
-                        // 否则每次 GetOptions() 都返回一个新对象，凡是「读-改-写」分两次
-                        // GetOptions() 的调用都会改在临时对象上，落盘的仍是全默认值
-                        // （例：Plugin.cs 里 NoBoxsetsAutoCreation 的自动回写）。
-                        this.options = tempOptions;
+                        this.options ??= new TOptionType();
+                        this._loadFailed = false;
                         return this.options;
                     }
 
                     using (var stream = this.fileSystem.OpenRead(this.OptionsFilePath))
                     {
-                        var deserialized = tempOptions.DeserializeFromJsonStream(stream, this.jsonSerializer);
-
-                        this.options = deserialized as TOptionType;
+                        var deserialized = new TOptionType().DeserializeFromJsonStream(stream, this.jsonSerializer);
+                        this.options = deserialized as TOptionType ?? new TOptionType();
+                        this._loadFailed = false;
+                        return this.options;
                     }
                 }
                 catch (Exception ex)
                 {
                     this.logger.ErrorException("Error loading plugin options for {0} from {1}", ex, this.pluginFullName, this.OptionsFilePath);
-                    this.options = tempOptions;
+                    this.options ??= new TOptionType();
+                    this._loadFailed = true;
+                    return this.options;
                 }
-
-                return this.options ?? new TOptionType();
             }
         }
 
@@ -106,6 +104,14 @@
                 throw new ArgumentNullException(nameof(newOptions));
             }
 
+            lock (this.lockObj)
+            {
+                if (this._loadFailed)
+                {
+                    throw new InvalidOperationException("Plugin configuration is corrupt. Repair or remove the file before saving.");
+                }
+            }
+
             var savingArgs = new FileSavingEventArgs(newOptions);
             this.FileSaving?.Invoke(this, savingArgs);
 
@@ -114,17 +120,24 @@
                 return;
             }
 
-            lock (this.lockObj)
+            var tempPath = this.OptionsFilePath + ".tmp-" + Guid.NewGuid().ToString("N");
+            try
             {
-                using (var stream = this.fileSystem.GetFileStream(this.OptionsFilePath, FileOpenMode.Create, FileAccessMode.Write))
+                lock (this.lockObj)
                 {
-                    this.jsonSerializer.SerializeToStream(newOptions, stream, new JsonSerializerOptions { Indent = true });
+                    using (var stream = this.fileSystem.GetFileStream(tempPath, FileOpenMode.Create, FileAccessMode.Write))
+                    {
+                        this.jsonSerializer.SerializeToStream(newOptions, stream, new JsonSerializerOptions { Indent = true });
+                    }
+
+                    AtomicFileReplacer.Replace(tempPath, this.OptionsFilePath);
+                    this.options = newOptions;
+                    this._loadFailed = false;
                 }
             }
-
-            lock (this.lockObj)
+            finally
             {
-                this.options = newOptions;
+                if (File.Exists(tempPath)) File.Delete(tempPath);
             }
 
             var savedArgs = new FileSavedEventArgs(newOptions);

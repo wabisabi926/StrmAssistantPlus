@@ -1,3 +1,5 @@
+using System;
+using System.IO;
 using Emby.Web.GenericEdit;
 using StrmAssistant.Tests.Support;
 using Xunit;
@@ -86,6 +88,33 @@ namespace StrmAssistant.Tests
 
             Assert.Same(options, store.GetOptions());
             Assert.True(System.IO.File.Exists(fixture.FilePath("TestPlugin")));
+        }
+
+        [Fact]
+        public void CorruptFile_IsPreservedAndCannotBeOverwrittenAutomatically()
+        {
+            using var fixture = new SimpleStoreFixture();
+            var path = fixture.FilePath("TestPlugin");
+            File.WriteAllText(path, "not-json");
+            var store = fixture.Create<SampleOptions>("TestPlugin");
+
+            var options = store.GetOptions();
+            Assert.NotNull(options);
+            Assert.Equal("not-json", File.ReadAllText(path));
+            Assert.Throws<InvalidOperationException>(() => store.SetOptions(new SampleOptions { Value = "overwrite" }));
+            Assert.Equal("not-json", File.ReadAllText(path));
+        }
+
+        [Fact]
+        public void SetOptions_UsesAtomicReplacementAndLeavesNoTempFile()
+        {
+            using var fixture = new SimpleStoreFixture();
+            var store = fixture.Create<SampleOptions>("TestPlugin");
+
+            store.SetOptions(new SampleOptions { Value = "atomic", Flag = true });
+
+            Assert.Equal("atomic", fixture.Create<SampleOptions>("TestPlugin").GetOptions().Value);
+            Assert.Empty(Directory.GetFiles(fixture.ConfigDir, "*.tmp-*"));
         }
 
         [Fact]

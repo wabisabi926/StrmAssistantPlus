@@ -95,16 +95,34 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
-        public void CorruptFile_IsNotRecorded_AndCanBeMarked()
+        public void CorruptFile_IsPreservedAndNotMarked()
         {
             WriteSchema("not-json");
+            var before = File.ReadAllText(SchemaPath);
 
             OptionsSchema.Initialize(_configDir, _logger);
             Assert.False(OptionsSchema.HasRecordedVersion);
+            Assert.True(OptionsSchema.HasCorruptFile);
 
             OptionsSchema.MarkCurrent(_logger);
 
-            Assert.Equal(1, ReadSchemaVersion());
+            Assert.Equal(before, File.ReadAllText(SchemaPath));
+            Assert.True(OptionsSchema.HasCorruptFile);
+        }
+
+        [Fact]
+        public void InvalidVersion_IsTreatedAsCorruptAndPreserved()
+        {
+            WriteSchema("{\"Version\":-1}");
+            var before = File.ReadAllText(SchemaPath);
+
+            OptionsSchema.Initialize(_configDir, _logger);
+            Assert.False(OptionsSchema.HasRecordedVersion);
+            Assert.True(OptionsSchema.HasCorruptFile);
+
+            OptionsSchema.MarkCurrent(_logger);
+
+            Assert.Equal(before, File.ReadAllText(SchemaPath));
         }
 
         [Fact]

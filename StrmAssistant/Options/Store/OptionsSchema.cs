@@ -1,4 +1,5 @@
 using MediaBrowser.Model.Logging;
+using StrmAssistant.Common;
 using System;
 using System.IO;
 using System.Text.Json;
@@ -28,6 +29,7 @@ namespace StrmAssistant.Options.Store
         private static string _directory;
 
         public static bool HasRecordedVersion { get; private set; }
+        public static bool HasCorruptFile { get; private set; }
 
         internal static int StoredVersion
         {
@@ -46,9 +48,14 @@ namespace StrmAssistant.Options.Store
 
                 var read = Read(configDirectory, logger);
                 HasRecordedVersion = read.Found;
+                HasCorruptFile = read.Corrupt;
                 _storedVersion = read.Version;
 
-                if (!read.Found)
+                if (read.Corrupt)
+                {
+                    logger?.Warn("OptionsSchema - schema file is corrupt; preserved without rewriting");
+                }
+                else if (!read.Found)
                 {
                     logger?.Info($"OptionsSchema - schema file missing; assume current v{CurrentVersion}");
                 }
@@ -71,7 +78,7 @@ namespace StrmAssistant.Options.Store
         {
             lock (Sync)
             {
-                if (!_initialized || _storedVersion >= CurrentVersion) return;
+                if (!_initialized || _storedVersion >= CurrentVersion || HasCorruptFile) return;
 
                 if (string.IsNullOrEmpty(_directory))
                 {
@@ -88,8 +95,18 @@ namespace StrmAssistant.Options.Store
                         UpdatedAt = DateTimeOffset.UtcNow,
                         PluginVersion = Plugin.Instance?.CurrentVersion
                     };
-                    File.WriteAllText(Path.Combine(_directory, FileName),
-                        JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true }));
+                    var path = Path.Combine(_directory, FileName);
+                    var tempPath = path + ".tmp-" + Guid.NewGuid().ToString("N");
+                    try
+                    {
+                        File.WriteAllText(tempPath,
+                            JsonSerializer.Serialize(record, new JsonSerializerOptions { WriteIndented = true }));
+                        AtomicFileReplacer.Replace(tempPath, path);
+                    }
+                    finally
+                    {
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                    }
                     _storedVersion = CurrentVersion;
                     HasRecordedVersion = true;
                     logger?.Info($"OptionsSchema - schema recorded as v{CurrentVersion}");
@@ -101,22 +118,27 @@ namespace StrmAssistant.Options.Store
             }
         }
 
-        internal static (bool Found, int Version) Read(string configDirectory, ILogger logger)
+        internal static (bool Found, int Version, bool Corrupt) Read(string configDirectory, ILogger logger)
         {
-            if (string.IsNullOrEmpty(configDirectory)) return (false, 0);
+            if (string.IsNullOrEmpty(configDirectory)) return (false, 0, false);
 
             var path = Path.Combine(configDirectory, FileName);
             try
             {
-                if (!File.Exists(path)) return (false, 0);
+                if (!File.Exists(path)) return (false, 0, false);
 
                 var record = JsonSerializer.Deserialize<SchemaRecord>(File.ReadAllText(path), ReadOptions);
-                return (true, record?.Version > 0 ? record.Version : 0);
+                if (record == null || record.Version < 0)
+                {
+                    logger?.Warn("OptionsSchema - schema file has no valid version; preserved without rewriting");
+                    return (false, 0, true);
+                }
+                return (true, record.Version, false);
             }
             catch (Exception e)
             {
                 logger?.Warn("OptionsSchema - failed to read schema file: " + e.Message);
-                return (false, 0);
+                return (false, 0, true);
             }
         }
 
@@ -128,6 +150,7 @@ namespace StrmAssistant.Options.Store
                 _storedVersion = 0;
                 _directory = null;
                 HasRecordedVersion = false;
+                HasCorruptFile = false;
             }
         }
 
