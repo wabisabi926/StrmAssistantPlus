@@ -46,6 +46,8 @@ namespace StrmAssistant
 
             var tasks = new List<Task>();
 
+            try
+            {
             foreach (var item in items)
             {
                 try
@@ -100,13 +102,18 @@ namespace StrmAssistant
                     }
                 }, CancellationToken.None);
                 tasks.Add(task);
-                Task.Delay(10).Wait();
+                await Task.Delay(10, cancellationToken).ConfigureAwait(false);
             }
             await Task.WhenAll(tasks).ConfigureAwait(false);
 
             progress.Report(100.0);
             _logger.Info($"MediaInfoPersist - Number of items skipped: {skip}");
             _logger.Info("MediaInfoPersist - Scheduled Task Complete");
+            }
+            finally
+            {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
         }
 
         public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_MediaInfo",

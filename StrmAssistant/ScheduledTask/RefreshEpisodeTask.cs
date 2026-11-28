@@ -105,7 +105,7 @@ namespace StrmAssistant.ScheduledTask
                         }
                     }, CancellationToken.None);
                     tasks.Add(task);
-                    Task.Delay(10).Wait();
+                    await Task.Delay(10, cancellationToken).ConfigureAwait(false);
                 }
                 await Task.WhenAll(tasks).ConfigureAwait(false);
 
@@ -114,6 +114,7 @@ namespace StrmAssistant.ScheduledTask
             }
             finally
             {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
                 // 取消路径（含 WaitAsync 抛出）必须复位，否则互斥判断会一直误判任务在跑
                 IsRunning = false;
             }

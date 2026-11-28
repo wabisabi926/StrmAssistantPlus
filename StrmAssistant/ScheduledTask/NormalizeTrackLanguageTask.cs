@@ -69,6 +69,8 @@ namespace StrmAssistant.ScheduledTask
             var changedStreams = 0;
             var tasks = new List<Task>();
 
+            try
+            {
             foreach (var item in items)
             {
                 try
@@ -120,7 +122,7 @@ namespace StrmAssistant.ScheduledTask
                 }, CancellationToken.None);
 
                 tasks.Add(task);
-                await Task.Delay(10).ConfigureAwait(false);
+                await Task.Delay(10, cancellationToken).ConfigureAwait(false);
             }
 
             await Task.WhenAll(tasks).ConfigureAwait(false);
@@ -139,6 +141,11 @@ namespace StrmAssistant.ScheduledTask
             else
             {
                 logger.Info($"TrackLanguage - 完成：检查 {total} 个条目，未发现需要修正的语言标签");
+            }
+            }
+            finally
+            {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
             }
         }
     }

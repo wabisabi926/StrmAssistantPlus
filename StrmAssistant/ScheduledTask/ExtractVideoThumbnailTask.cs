@@ -171,6 +171,7 @@ namespace StrmAssistant.ScheduledTask
             }
             finally
             {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
                 // 取消路径（含 WaitAsync 抛出）必须复位，否则互斥判断会一直误判任务在跑
                 if (items.Count > 0) IsRunning = false;
             }

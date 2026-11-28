@@ -1,5 +1,7 @@
 using StrmAssistant.Common;
 using StrmAssistant.ScheduledTask;
+using System;
+using System.IO;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -21,6 +23,16 @@ namespace StrmAssistant.Tests
         public void ShouldIncludeAllClearLibraries_WhenAllScopesBlank()
         {
             Assert.True(ChapterApi.ShouldIncludeAllClearLibraries(new[] { string.Empty, "  ", null }));
+        }
+
+        [Fact]
+        public void ClearTask_IncludesAllMarkerSources()
+        {
+            var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            var source = File.ReadAllText(Path.Combine(root, "StrmAssistant/Common/ChapterApi.cs"));
+
+            Assert.DoesNotContain("AllowOverwrite(c, !clearAll)", source);
+            Assert.Contains("c.MarkerType == MarkerType.CreditsStart);", source);
         }
 
         [Theory]

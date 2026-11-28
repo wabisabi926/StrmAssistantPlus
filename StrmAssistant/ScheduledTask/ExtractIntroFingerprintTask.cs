@@ -99,6 +99,7 @@ namespace StrmAssistant.ScheduledTask
             var episodeWeight = !mediaInfoRestoreMode ? 0.8 : 1.0;
             var seasonWeight = !mediaInfoRestoreMode ? 0.2 : 0.0;
             var seasonProgressMap = new ConcurrentDictionary<Season, double>();
+            var startedTasks = new List<Task>();
 
             try
             {
@@ -233,6 +234,7 @@ namespace StrmAssistant.ScheduledTask
                             }
                         }, CancellationToken.None);
                         episodeTasks.Add(task);
+                        startedTasks.Add(task);
                     }
 
                     if (cancellationToken.IsCancellationRequested)
@@ -319,6 +321,7 @@ namespace StrmAssistant.ScheduledTask
                         }
                     }, CancellationToken.None);
                     seasonTasks.Add(seasonTask);
+                    startedTasks.Add(seasonTask);
                 }
 
                 await Task.WhenAll(seasonTasks).ConfigureAwait(false);
@@ -330,6 +333,7 @@ namespace StrmAssistant.ScheduledTask
             }
             finally
             {
+                await Task.WhenAll(startedTasks).ConfigureAwait(false);
                 // 取消路径（含 WaitAsync 抛出）必须复位，否则自动补漏等互斥判断会一直误判
                 if (totalEpisodes > 0) IsRunning = false;
             }

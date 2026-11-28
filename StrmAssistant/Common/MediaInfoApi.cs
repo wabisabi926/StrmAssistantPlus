@@ -16,6 +16,7 @@ using MediaBrowser.Model.Serialization;
 using StrmAssistant.Core;
 using StrmAssistant.Mod;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -36,6 +37,8 @@ namespace StrmAssistant.Common
         private readonly IProviderManager _providerManager;
 
         private const string MediaInfoFileExtension = "-mediainfo.json";
+        private static readonly ConcurrentDictionary<long, SemaphoreSlim> JsonWriteLocks =
+            new ConcurrentDictionary<long, SemaphoreSlim>();
 
         private static readonly PatchTracker PatchTracker =
             new PatchTracker(typeof(MediaInfoApi),
@@ -51,6 +54,7 @@ namespace StrmAssistant.Common
             public bool? ZeroFingerprintConfidence { get; set; }
             public string EmbeddedImage { get; set; }
             public string SourcePath { get; set; }
+            public string SourceItemId { get; set; }
         }
 
         public MediaInfoApi(ILibraryManager libraryManager, IFileSystem fileSystem, IProviderManager providerManager,
@@ -411,6 +415,7 @@ namespace StrmAssistant.Common
 
                     foreach (var jsonItem in mediaSourcesWithChapters)
                     {
+                        jsonItem.SourceItemId = jsonItem.MediaSourceInfo.ItemId;
                         jsonItem.MediaSourceInfo.Id = null;
                         jsonItem.MediaSourceInfo.ItemId = null;
                         jsonItem.MediaSourceInfo.Path = null;
@@ -453,7 +458,24 @@ namespace StrmAssistant.Common
                         Directory.CreateDirectory(parentDirectory);
                     }
 
-                    _jsonSerializer.SerializeToFile(mediaSourcesWithChapters, mediaInfoJsonPath);
+                    var writeLock = JsonWriteLocks.GetOrAdd(item.InternalId, _ => new SemaphoreSlim(1, 1));
+                    await writeLock.WaitAsync(CancellationToken.None).ConfigureAwait(false);
+                    var tempPath = mediaInfoJsonPath + ".tmp-" + Guid.NewGuid().ToString("N");
+                    try
+                    {
+                        using (var stream = _fileSystem.GetFileStream(tempPath, FileOpenMode.Create, FileAccessMode.Write))
+                        {
+                            _jsonSerializer.SerializeToStream(mediaSourcesWithChapters, stream,
+                                new MediaBrowser.Model.Serialization.JsonSerializerOptions { Indent = true });
+                        }
+
+                        AtomicFileReplacer.Replace(tempPath, mediaInfoJsonPath);
+                    }
+                    finally
+                    {
+                        writeLock.Release();
+                        if (File.Exists(tempPath)) File.Delete(tempPath);
+                    }
 
                     _logger.Info("MediaInfoPersist - Serialization Success (" + source + "): " + mediaInfoJsonPath);
 
@@ -531,48 +553,96 @@ namespace StrmAssistant.Common
             {
                 try
                 {
-                    var mediaSourceWithChapters =
-                        (await _jsonSerializer
+                    var backups = (await _jsonSerializer
                             .DeserializeFromFileAsync<List<MediaSourceWithChapters>>(mediaInfoJsonPath)
-                            .ConfigureAwait(false))?.FirstOrDefault();
+                            .ConfigureAwait(false))?
+                        .Where(backup => backup?.MediaSourceInfo != null)
+                        .ToList();
                     cancellationToken.ThrowIfCancellationRequested();
-                    if (!IsBackupForItem(mediaSourceWithChapters, item, mediaInfoJsonPath)) return false;
+                    if (backups == null || backups.Count == 0) return false;
 
-                    if (mediaSourceWithChapters?.MediaSourceInfo?.RunTimeTicks.HasValue is true &&
+                    var primary = backups.FirstOrDefault(backup =>
+                            !string.IsNullOrEmpty(backup.SourceItemId) &&
+                            string.Equals(backup.SourceItemId, item.Id.ToString(), StringComparison.OrdinalIgnoreCase))
+                        ?? backups[0];
+                    if (!IsBackupForItem(primary, item, mediaInfoJsonPath)) return false;
+
+                    if (primary.MediaSourceInfo.RunTimeTicks.HasValue &&
                         (ignoreFileChange || !Plugin.LibraryApi.HasFileChanged(item, directoryService)))
                     {
-                        foreach (var subtitle in mediaSourceWithChapters.MediaSourceInfo.MediaStreams.Where(m =>
-                                     m.IsExternal && m.Type == MediaStreamType.Subtitle &&
-                                     m.Protocol == MediaProtocol.File))
+                        var restoreTargets = backups.Count > 1 && backups.All(backup => !string.IsNullOrEmpty(backup.SourceItemId))
+                            ? backups
+                            : new List<MediaSourceWithChapters> { primary };
+                        var restored = 0;
+
+                        foreach (var backup in restoreTargets)
                         {
-                            subtitle.Path = Path.Combine(workItem.ContainingFolderPath,
-                                _fileSystem.GetFileInfo(subtitle.Path).Name);
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var targetItem = workItem;
+                            if (!string.IsNullOrEmpty(backup.SourceItemId) &&
+                                !string.Equals(backup.SourceItemId, item.Id.ToString(), StringComparison.OrdinalIgnoreCase))
+                            {
+                                targetItem = _libraryManager.GetItemById(backup.SourceItemId);
+                            }
+
+                            if (targetItem == null)
+                            {
+                                _logger.Warn("MediaInfoPersist - source item missing during restore: " + backup.SourceItemId);
+                                continue;
+                            }
+
+                            foreach (var subtitle in backup.MediaSourceInfo.MediaStreams.Where(m =>
+                                         m.IsExternal && m.Type == MediaStreamType.Subtitle &&
+                                         m.Protocol == MediaProtocol.File))
+                            {
+                                subtitle.Path = Path.Combine(targetItem.ContainingFolderPath,
+                                    _fileSystem.GetFileInfo(subtitle.Path).Name);
+                            }
+
+                            _itemRepository.SaveMediaStreams(targetItem.InternalId,
+                                backup.MediaSourceInfo.MediaStreams, cancellationToken);
+
+                            if (targetItem is Video video)
+                            {
+                                ChapterChangeTracker.BypassInstance(video);
+                                await DeserializeChapterInfo(video, backup.Chapters, directoryService,
+                                    source, cancellationToken).ConfigureAwait(false);
+
+                                if (video is Episode episode && backup.ZeroFingerprintConfidence is true)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    _itemRepository.LogIntroDetectionFailureFailure(episode.InternalId,
+                                        episode.DateModified.ToUnixTimeSeconds());
+                                }
+                            }
+
+                            if (targetItem == workItem && workItem is Audio &&
+                                !string.IsNullOrEmpty(backup.EmbeddedImage))
+                            {
+                                var imageBytes = Convert.FromBase64String(backup.EmbeddedImage);
+                                var tempPath = Path.Combine(Plugin.Instance.ApplicationPaths.TempDirectory,
+                                    Guid.NewGuid() + ".jpg");
+                                await _fileSystem.WriteAllBytesAsync(tempPath, imageBytes, cancellationToken)
+                                    .ConfigureAwait(false);
+
+                                var libraryOptions = _libraryManager.GetLibraryOptions(workItem);
+                                await _providerManager.SaveImage(workItem, libraryOptions, tempPath, ImageType.Primary,
+                                        null, Array.Empty<long>(), directoryService, false, cancellationToken)
+                                    .ConfigureAwait(false);
+                            }
+
+                            restored++;
                         }
 
-                        _itemRepository.SaveMediaStreams(item.InternalId,
-                            mediaSourceWithChapters.MediaSourceInfo.MediaStreams, cancellationToken);
-
-                        if (workItem is Audio && !string.IsNullOrEmpty(mediaSourceWithChapters.EmbeddedImage))
-                        {
-                            var imageBytes = Convert.FromBase64String(mediaSourceWithChapters.EmbeddedImage);
-                            var tempPath = Path.Combine(Plugin.Instance.ApplicationPaths.TempDirectory,
-                                Guid.NewGuid() + ".jpg");
-                            await _fileSystem.WriteAllBytesAsync(tempPath, imageBytes, cancellationToken)
-                                .ConfigureAwait(false);
-
-                            var libraryOptions = _libraryManager.GetLibraryOptions(workItem);
-                            await _providerManager.SaveImage(workItem, libraryOptions, tempPath, ImageType.Primary,
-                                    null, Array.Empty<long>(), directoryService, false, cancellationToken)
-                                .ConfigureAwait(false);
-                        }
+                        if (restored == 0) return false;
 
                         cancellationToken.ThrowIfCancellationRequested();
-                        workItem.Size = mediaSourceWithChapters.MediaSourceInfo.Size.GetValueOrDefault();
-                        workItem.RunTimeTicks = mediaSourceWithChapters.MediaSourceInfo.RunTimeTicks;
-                        workItem.Container = mediaSourceWithChapters.MediaSourceInfo.Container;
-                        workItem.TotalBitrate = mediaSourceWithChapters.MediaSourceInfo.Bitrate.GetValueOrDefault();
+                        workItem.Size = primary.MediaSourceInfo.Size.GetValueOrDefault();
+                        workItem.RunTimeTicks = primary.MediaSourceInfo.RunTimeTicks;
+                        workItem.Container = primary.MediaSourceInfo.Container;
+                        workItem.TotalBitrate = primary.MediaSourceInfo.Bitrate.GetValueOrDefault();
 
-                        var videoStream = mediaSourceWithChapters.MediaSourceInfo.MediaStreams
+                        var videoStream = primary.MediaSourceInfo.MediaStreams
                             .Where(s => s.Type == MediaStreamType.Video && s.Width.HasValue && s.Height.HasValue)
                             .OrderByDescending(s => (long)s.Width.Value * s.Height.Value)
                             .FirstOrDefault();
@@ -586,22 +656,8 @@ namespace StrmAssistant.Common
                         _libraryManager.UpdateItems(new List<BaseItem> { workItem }, null,
                             ItemUpdateType.MetadataImport, false, false, null, cancellationToken);
 
-                        if (workItem is Video video)
-                        {
-                            ChapterChangeTracker.BypassInstance(video);
-                            await DeserializeChapterInfo(video, mediaSourceWithChapters.Chapters, directoryService,
-                                source, cancellationToken).ConfigureAwait(false);
-
-                            if (video is Episode && mediaSourceWithChapters.ZeroFingerprintConfidence is true)
-                            {
-                                cancellationToken.ThrowIfCancellationRequested();
-                                _itemRepository.LogIntroDetectionFailureFailure(video.InternalId,
-                                    item.DateModified.ToUnixTimeSeconds());
-                            }
-                        }
-
-                        _logger.Info("MediaInfoPersist - Deserialization Success (" + source + "): " + mediaInfoJsonPath);
-
+                        _logger.Info("MediaInfoPersist - Deserialization Success (" + source + "): " + mediaInfoJsonPath +
+                                     $", sources={restored}");
                         return true;
                     }
 

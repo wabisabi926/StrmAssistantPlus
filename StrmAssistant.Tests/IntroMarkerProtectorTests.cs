@@ -141,6 +141,24 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void RestorableMarker_FiltersInvalidDbMarkersButKeepsExternalSources()
+        {
+            var runtime = TimeSpan.FromMinutes(20).Ticks;
+            var chapters = new List<ChapterInfo>
+            {
+                new ChapterInfo { MarkerType = MarkerType.IntroStart, StartPositionTicks = TimeSpan.FromSeconds(5).Ticks, Name = "IntroStart#DB" },
+                new ChapterInfo { MarkerType = MarkerType.IntroEnd, StartPositionTicks = TimeSpan.FromSeconds(15).Ticks, Name = "IntroEnd#DB" },
+                new ChapterInfo { MarkerType = MarkerType.CreditsStart, StartPositionTicks = TimeSpan.FromSeconds(10).Ticks, Name = "CreditsStart#DB" },
+                new ChapterInfo { MarkerType = MarkerType.IntroStart, StartPositionTicks = 1, Name = "IntroStart#SA" }
+            };
+
+            Assert.True(IntroMarkerProtector.IsRestorableMarker(chapters[0], chapters, runtime));
+            Assert.True(IntroMarkerProtector.IsRestorableMarker(chapters[1], chapters, runtime));
+            Assert.False(IntroMarkerProtector.IsRestorableMarker(chapters[2], chapters, runtime));
+            Assert.True(IntroMarkerProtector.IsRestorableMarker(chapters[3], chapters, runtime));
+        }
+
+        [Fact]
         public void MergeMissingMarkers_HandlesEmptyExisting()
         {
             var incoming = new List<ChapterInfo>

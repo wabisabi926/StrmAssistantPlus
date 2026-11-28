@@ -156,7 +156,7 @@ namespace StrmAssistant.ScheduledTask
                             timeoutCts?.Dispose();
 
                             // 强制重新提取的条目：本次已探测过，清除标记避免后续任务重复处理
-                            if (LibraryApi.IsForceReExtract(taskItem.InternalId))
+                            if (result == true && LibraryApi.IsForceReExtract(taskItem.InternalId))
                             {
                                 LibraryApi.ClearForceReExtract(taskItem.InternalId);
                                 _logger.Info($"MediaInfoExtract - Force re-extract completed: {taskItem.Name}");
@@ -198,6 +198,7 @@ namespace StrmAssistant.ScheduledTask
             }
             finally
             {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
                 LibraryApi.FlushForceReExtract();
                 // 取消路径（含 WaitAsync 抛出）必须复位，否则自动补漏会一直误判任务在跑
                 if (items.Count > 0) IsRunning = false;

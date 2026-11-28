@@ -186,9 +186,9 @@ namespace StrmAssistant.Mod
             try
             {
                 if (item == null) return new List<ChapterInfo>();
-                return BaseItem.ItemRepository.GetChapters(item)?
-                    .Where(c => ProtectedMarkerTypes.Contains(c.MarkerType)).ToList()
-                    ?? new List<ChapterInfo>();
+                var chapters = BaseItem.ItemRepository.GetChapters(item) ?? new List<ChapterInfo>();
+                var runtime = item.RunTimeTicks;
+                return chapters.Where(c => IsRestorableMarker(c, chapters, runtime)).ToList();
             }
             catch (Exception e)
             {
@@ -220,6 +220,34 @@ namespace StrmAssistant.Mod
                 return false;
             }
         }
+
+        internal static bool IsRestorableMarker(ChapterInfo chapter, IReadOnlyList<ChapterInfo> chapters,
+            long? runtimeTicks)
+        {
+            if (chapter == null || !IsDbMarker(chapter)) return chapter != null;
+            if (chapter.MarkerType == MarkerType.CreditsStart)
+                return ChapterApi.IsValidCreditsStart(chapter.StartPositionTicks, runtimeTicks);
+
+            var introStarts = chapters.Where(c => c?.MarkerType == MarkerType.IntroStart && IsDbMarker(c)).ToList();
+            var introEnds = chapters.Where(c => c?.MarkerType == MarkerType.IntroEnd && IsDbMarker(c)).ToList();
+            if (introStarts.Count > 0 && introEnds.Count > 0)
+            {
+                return introStarts.Count == 1 && introEnds.Count == 1 &&
+                       ChapterApi.IsValidIntroRange(introStarts[0].StartPositionTicks,
+                           introEnds[0].StartPositionTicks, runtimeTicks);
+            }
+
+            if (chapter.MarkerType == MarkerType.IntroStart)
+                return chapter.StartPositionTicks >= 0 &&
+                       (!runtimeTicks.HasValue || chapter.StartPositionTicks < runtimeTicks.Value);
+            if (chapter.MarkerType == MarkerType.IntroEnd)
+                return chapter.StartPositionTicks > 0 &&
+                       (!runtimeTicks.HasValue || chapter.StartPositionTicks <= runtimeTicks.Value);
+            return true;
+        }
+
+        private static bool IsDbMarker(ChapterInfo chapter) =>
+            chapter?.Name != null && chapter.Name.EndsWith("#DB", StringComparison.Ordinal);
 
         /// <summary>
         /// 新章节列表里没有出现的标记类型，从旧列表中补回；同一类型以新列表为准。

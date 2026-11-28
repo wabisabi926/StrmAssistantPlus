@@ -46,6 +46,8 @@ namespace StrmAssistant.ScheduledTask
 
             var tasks = new List<Task>();
 
+            try
+            {
             foreach (var item in items)
             {
                 try
@@ -130,6 +132,11 @@ namespace StrmAssistant.ScheduledTask
 
             progress.Report(100.0);
             _logger.Info("ExternalSubtitle - Scheduled Task Complete");
+            }
+            finally
+            {
+                await Task.WhenAll(tasks).ConfigureAwait(false);
+            }
         }
 
         public string Category => Resources.ResourceManager.GetString("ScheduledTask_Category_MediaInfo",

@@ -9,6 +9,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Querying;
 using StrmAssistant.IntroSkip;
+using StrmAssistant.Mod;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -375,7 +376,15 @@ namespace StrmAssistant.Common
             if (changed)
             {
                 chapters.Sort((c1, c2) => c1.StartPositionTicks.CompareTo(c2.StartPositionTicks));
-                _itemRepository.SaveChapters(item.InternalId, chapters);
+                IntroMarkerProtector.BypassInstance(item);
+                try
+                {
+                    _itemRepository.SaveChapters(item.InternalId, chapters);
+                }
+                finally
+                {
+                    IntroMarkerProtector.ClearBypass();
+                }
                 IntroMarkerNotifier.Notify(item);
             }
 
@@ -386,11 +395,6 @@ namespace StrmAssistant.Common
         {
             return IsMarkerAddedByIntroSkip(chapter) ||
                    IsIntroSkipPreferenceSelected(IntroSkipPlaybackOptions.IntroSkipPreference.ResetAndOverwrite);
-        }
-
-        private static bool AllowOverwrite(ChapterInfo chapter, bool ignore)
-        {
-            return IsMarkerAddedByIntroSkip(chapter) || ignore;
         }
 
         private static BaseItem[] GetEpisodesInSeason(Season season, int? minIndexNumber = null)
@@ -698,8 +702,8 @@ namespace StrmAssistant.Common
                 if (chapters != null && chapters.Any())
                 {
                     var hasMarkers = chapters.Any(c =>
-                        (c.MarkerType == MarkerType.IntroStart || c.MarkerType == MarkerType.IntroEnd ||
-                         c.MarkerType == MarkerType.CreditsStart) && AllowOverwrite(c, !clearAll));
+                        c.MarkerType == MarkerType.IntroStart || c.MarkerType == MarkerType.IntroEnd ||
+                        c.MarkerType == MarkerType.CreditsStart);
                     if (hasMarkers)
                     {
                         items.Add(item);

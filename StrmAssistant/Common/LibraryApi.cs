@@ -568,6 +568,7 @@ namespace StrmAssistant.Common
                 var task = Task.Run(async () =>
                 {
                     CancellationTokenSource timeoutCts = null;
+                    bool? result = null;
 
                     try
                     {
@@ -589,7 +590,7 @@ namespace StrmAssistant.Common
                             itemToken = timeoutCts.Token;
                         }
 
-                        var result = await OrchestrateMediaInfoProcessAsync(taskItem,
+                        result = await OrchestrateMediaInfoProcessAsync(taskItem,
                             "MediaInfoExtract AutoCatchup", itemToken).ConfigureAwait(false);
 
                         if (result is true)
@@ -626,7 +627,7 @@ namespace StrmAssistant.Common
                         timeoutCts?.Dispose();
 
                         // 强制重新提取的条目：本次已处理，清除标记避免每次扫库都补回重复探测
-                        if (LibraryApi.IsForceReExtract(taskItem.InternalId))
+                        if (result == true && LibraryApi.IsForceReExtract(taskItem.InternalId))
                         {
                             LibraryApi.ClearForceReExtract(taskItem.InternalId);
                             _logger.Info("MediaInfoExtract - Auto catch-up force re-extract completed: " +

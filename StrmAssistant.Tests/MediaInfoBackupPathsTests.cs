@@ -40,6 +40,18 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void JsonPersistence_IsAtomicAndKeepsSourceIdentity()
+        {
+            var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            var source = File.ReadAllText(Path.Combine(root, "StrmAssistant/Common/MediaInfoApi.cs"));
+
+            Assert.Contains("SourceItemId", source);
+            Assert.Contains("JsonWriteLocks", source);
+            Assert.Contains("AtomicFileReplacer.Replace(tempPath, mediaInfoJsonPath)", source);
+            Assert.DoesNotContain("SerializeToFile(mediaSourcesWithChapters, mediaInfoJsonPath)", source);
+        }
+
+        [Fact]
         public void NativeRootedPath_PreservesLegacyCentralLayout()
         {
             var root = Path.Combine(Path.GetTempPath(), "strm-backup-tests");
