@@ -19,15 +19,13 @@ namespace StrmAssistant.Tests
         [InlineData("Movie", "Movie", true)]
         [InlineData("S01E01", "S01E01", true)]
         [InlineData("流浪地球", "流浪地球", true)]
-        // 合法分隔符边界
+        // 合法附属文件：精确同名、语言/标记、已知元数据后缀
         [InlineData("Movie", "Movie.en", true)]
         [InlineData("Movie", "Movie-poster", true)]
-        [InlineData("Movie", "Movie (2020)", true)]
-        [InlineData("Movie", "Movie_1080p", true)]
-        [InlineData("Movie", "Movie[2160p]", true)]
-        [InlineData("Movie", "Movie+extras", true)]
         [InlineData("Movie", "Movie-mediainfo", true)]
-        // 非分隔符 → 属于另一部影片，必须拒绝
+        [InlineData("Movie", "Movie.chs.forced", true)]
+        [InlineData("Movie", "Movie.sdh", true)]
+        // 非分隔符或疑似另一版本/另一部影片 → 必须拒绝
         [InlineData("Movie", "Movie2", false)]
         [InlineData("Movie", "MovieA", false)]
         [InlineData("Movie", "MovieII", false)]
@@ -35,6 +33,12 @@ namespace StrmAssistant.Tests
         [InlineData("Movie", "Movie2-mediainfo", false)]
         [InlineData("Movie", "Movie2.en", false)]
         [InlineData("Movie", "Movie2-poster", false)]
+        [InlineData("Movie", "Movie 2", false)]
+        [InlineData("Movie", "Movie_1080p", false)]
+        [InlineData("Movie", "Movie_2160p", false)]
+        [InlineData("Movie", "Movie[2160p]", false)]
+        [InlineData("Movie", "Movie (2020)", false)]
+        [InlineData("Movie", "Movie+extras", false)]
         // 多版本：只匹配同一个版本的附属文件
         [InlineData("Movie - 1080p", "Movie - 1080p", true)]
         [InlineData("Movie - 1080p", "Movie - 2160p", false)]

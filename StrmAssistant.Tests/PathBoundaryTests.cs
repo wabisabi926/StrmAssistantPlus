@@ -99,6 +99,42 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void IsLocalFileInScope_RejectsJunctionOutsideRoot()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+
+            var sandbox = Path.Combine(Path.GetTempPath(), "strmassistant-boundary-" + Guid.NewGuid().ToString("N"));
+            var root = Path.Combine(sandbox, "library");
+            var outside = Path.Combine(sandbox, "outside");
+            var junction = Path.Combine(root, "linked");
+            Directory.CreateDirectory(root);
+            Directory.CreateDirectory(outside);
+            File.WriteAllText(Path.Combine(outside, "movie.mkv"), "test");
+
+            try
+            {
+                var start = new System.Diagnostics.ProcessStartInfo("cmd.exe",
+                    $"/c mklink /J \"{junction}\" \"{outside}\"")
+                {
+                    CreateNoWindow = true,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                using var process = System.Diagnostics.Process.Start(start);
+                process.WaitForExit();
+                Assert.True(process.ExitCode == 0, process.StandardError.ReadToEnd());
+
+                Assert.False(PathBoundary.IsLocalFileInScope(Path.Combine(junction, "movie.mkv"), new[] { root }));
+            }
+            finally
+            {
+                if (Directory.Exists(junction)) Directory.Delete(junction);
+                if (Directory.Exists(sandbox)) Directory.Delete(sandbox, true);
+            }
+        }
+
+        [Fact]
         public void IsSameOrDescendant_HandlesUncRootOnWindows()
         {
             if (!OperatingSystem.IsWindows()) return;

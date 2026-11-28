@@ -34,16 +34,16 @@ namespace StrmAssistant.Web.Service
             _fileSystem = fileSystem;
         }
 
-        public void Any(DeleteVersion request)
+        public DeleteVersionResult Any(DeleteVersion request)
         {
-            if (!Plugin.IsPluginEnabled) return;
+            if (!Plugin.IsPluginEnabled) return new DeleteVersionResult { Status = "NoAction" };
 
             var item = _libraryManager.GetItemById(request.Id);
 
             if (!(item is Video video) || !(video is Movie || video is Episode) || !video.IsFileProtocol ||
                 video.GetAlternateVersionIds().Count == 0)
             {
-                return;
+                return new DeleteVersionResult { Status = "NoAction" };
             }
             
             var user = GetUserForRequest(null);
@@ -61,14 +61,27 @@ namespace StrmAssistant.Web.Service
             if (deletePlan.IsDenied || deletePlan.UnauthorizedCount > 0)
             {
                 _logger.Info("DeleteVersion - delete plan rejected because one or more items are not authorized");
-                return;
+                return new DeleteVersionResult
+                {
+                    Status = "Denied",
+                    WouldDeleteCount = deletePlan.Authorized.Count,
+                    SkippedCount = deletePlan.UnauthorizedCount
+                };
             }
 
             var deleteItems = deletePlan.Authorized.ToList();
             var enableDeepDelete = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Playback.EnableDeepDelete;
             var enableNotification = Plugin.Instance.ExperienceEnhanceStore.GetOptions().Notification.EnhanceNotificationSystem;
 
-            if (DryRunMode.Skip($"delete {deleteItems.Count} version item(s)", _logger)) return;
+            if (DryRunMode.Skip($"delete {deleteItems.Count} version item(s)", _logger))
+            {
+                return new DeleteVersionResult
+                {
+                    Status = "DryRun",
+                    WouldDeleteCount = deleteItems.Count,
+                    SkippedCount = deletePlan.UnauthorizedCount
+                };
+            }
 
             var allMountPaths = new Dictionary<string, bool?>();
             var deleteFiles = new List<string>();
@@ -115,7 +128,13 @@ namespace StrmAssistant.Web.Service
             if (!transaction.Committed)
             {
                 _logger.Error("DeleteVersion - transaction rolled back: " + transaction.Error);
-                return;
+                return new DeleteVersionResult
+                {
+                    Status = "RolledBack",
+                    WouldDeleteCount = deleteItems.Count,
+                    RetainedStagingCount = transaction.RetainedStagingPaths.Count,
+                    Error = "Delete transaction failed; check server logs."
+                };
             }
 
             if (transaction.RetainedStagingPaths.Count > 0)
@@ -129,6 +148,14 @@ namespace StrmAssistant.Web.Service
                 _ = BackgroundTaskRunner.Run("DeepDelete.Notify", () => Plugin.NotificationApi.DeepDeleteSendNotification(item, user,
                     new HashSet<string>(allMountPaths.Keys)));
             }
+
+            return new DeleteVersionResult
+            {
+                Status = "Deleted",
+                WouldDeleteCount = deleteItems.Count,
+                DeletedCount = deleteItems.Count,
+                RetainedStagingCount = transaction.RetainedStagingPaths.Count
+            };
         }
 
         private string[] GetDeepDeleteScope(BaseItem item)

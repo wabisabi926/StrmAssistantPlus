@@ -28,6 +28,22 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
+        public void Delete_ReturnsStructuredStatus()
+        {
+            var api = ReadSource("StrmAssistant/Web/Api/DeleteVersion.cs");
+            var service = ReadSource("StrmAssistant/Web/Service/LibraryService.cs");
+            var script = ReadSource("StrmAssistant/Web/Resources/strmassistant.js");
+
+            Assert.Contains("IReturn<DeleteVersionResult>", api);
+            Assert.Contains("DeleteVersionResult Any(DeleteVersion request)", service);
+            Assert.Contains("\"DryRun\"", service);
+            Assert.Contains("\"Denied\"", service);
+            Assert.Contains("\"RolledBack\"", service);
+            Assert.Contains("result.Status", script);
+            Assert.Contains("演练完成，未删除内容", script);
+        }
+
+        [Fact]
         public void Frontend_PreviewsBeforeDelete()
         {
             var source = ReadSource("StrmAssistant/Web/Resources/strmassistant.js");

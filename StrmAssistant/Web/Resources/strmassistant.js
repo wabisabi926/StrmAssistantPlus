@@ -421,12 +421,39 @@ define([
                         url: deleteApi,
                         data: {},
                         contentType: "application/json"
-                    }).then(() => {
+                    }).then(function(result) {
                         loading.hide();
                         const locale = globalize.getCurrentLocale().toLowerCase();
-                        const confirmMessage = (locale === 'zh-cn') ? '\u5220\u9664\u7248\u672c\u6210\u529f' :
-                            (['zh-hk', 'zh-tw'].includes(locale) ? '\u524a\u9664\u7248\u672c\u6210\u529f' : 'Delete Version Success');
-                        toast(confirmMessage);
+                        const status = result && result.Status;
+                        if (status === 'Deleted') {
+                            const message = result.RetainedStagingCount > 0
+                                ? (locale === 'zh-cn' ? '删除完成，但暂存目录清理失败，请查看服务器日志。' :
+                                    (['zh-hk', 'zh-tw'].includes(locale) ? '刪除完成，但暫存目錄清理失敗，請查看伺服器記錄。' :
+                                        'Delete completed, but staging cleanup failed. Check server logs.'))
+                                : (locale === 'zh-cn' ? '\u5220\u9664\u7248\u672c\u6210\u529f' :
+                                    (['zh-hk', 'zh-tw'].includes(locale) ? '\u524a\u9664\u7248\u672c\u6210\u529f' : 'Delete Version Success'));
+                            toast(message);
+                            return;
+                        }
+                        if (status === 'DryRun') {
+                            toast(locale === 'zh-cn' ? '演练完成，未删除内容。' :
+                                (['zh-hk', 'zh-tw'].includes(locale) ? '演練完成，未刪除內容。' :
+                                    'Dry run completed. Nothing was deleted.'));
+                            return;
+                        }
+                        if (status === 'Denied') {
+                            toast(locale === 'zh-cn' ? '无权限或版本无法确认，未删除。' :
+                                (['zh-hk', 'zh-tw'].includes(locale) ? '無權限或版本無法確認，未刪除。' :
+                                    'Not authorized or the version could not be confirmed. Nothing was deleted.'));
+                            return;
+                        }
+                        if (status === 'RolledBack') {
+                            toast(locale === 'zh-cn' ? '删除失败，文件已回滚，请查看服务器日志。' :
+                                (['zh-hk', 'zh-tw'].includes(locale) ? '刪除失敗，檔案已回滾，請查看伺服器記錄。' :
+                                    'Delete failed and files were rolled back. Check server logs.'));
+                            return;
+                        }
+                        toastOperationFailed();
                     }).catch(() => {
                         loading.hide();
                         toastOperationFailed();

@@ -1702,33 +1702,53 @@ namespace StrmAssistant.Common
             Mod.MergeMultiVersion.ClearSeriesGroupingCache();
         }
 
+        private static readonly HashSet<string> SidecarTokens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "mediainfo", "poster", "fanart", "logo", "clearart", "disc", "discart", "thumb", "thumbnail",
+            "landscape", "backdrop", "banner", "folder", "nfo", "xml", "srt", "sub", "idx", "vtt", "ass",
+            "ssa", "smi", "ttml", "edl", "bif", "txt", "json", "jpg", "jpeg", "png", "webp", "avif",
+            "forced", "sdh", "cc", "default", "normal", "full", "dub",
+            "en", "eng", "zh", "chi", "zho", "chs", "cht", "zhtw", "yue", "ja", "jpn", "ko", "kor",
+            "fr", "fra", "de", "ger", "deu", "es", "spa", "it", "ita", "ru", "rus", "pt", "por",
+            "ar", "ara", "hi", "hin", "th", "tha", "vi", "vie", "id", "ind", "ms", "may", "tr", "tur",
+            "nl", "dut", "pl", "pol", "sv", "swe", "da", "dan", "fi", "fin", "no", "nor", "cs", "cze",
+            "sk", "slo", "el", "gre", "hu", "hun", "ro", "rum", "bg", "bul", "uk", "ukr", "he", "heb",
+            "fa", "fas", "bn", "ben", "ta", "tam", "te", "tel", "ml", "mal", "kn", "kan", "mr", "mar",
+            "gu", "guj", "pa", "pan", "ur", "urd", "sd", "sin", "si", "sinh", "km", "khm", "lo", "lao",
+            "my", "mya", "ka", "geo", "hy", "arm", "az", "aze", "kk", "kaz", "uz", "uzb", "mn", "mon",
+            "ne", "nep", "us", "gb", "uk", "cn", "hk", "tw", "sg", "jp", "kr", "ca", "au", "nz", "in",
+            "br", "se", "cz", "gr", "ua", "il", "ir", "bd", "pk", "lk", "np", "mm", "vn", "ph", "kz"
+        };
+
         /// <summary>
         /// 判断某个（已去掉扩展名的）文件名是否属于 <paramref name="basename"/> 的附属文件。
-        ///
-        /// ⚠️ 必须校验名称边界：直接 StartsWith 会让 Movie 吃掉 Movie2 的 nfo / 字幕 / 图片 /
-        /// 以及本插件自己生成的 *-mediainfo.json，进而在「删除版本」时误删其他影片的附属文件。
-        /// 边界采用**分隔符白名单**（正向定义）：漏判的后果是少删一个附属文件，
-        /// 而反向（只排除数字）会漏掉 MovieA / MovieII / 中文续集名等情形。
+        /// 只接受精确同名或已知语言/元数据标记，避免把其他版本和其他影片纳入删除集合。
         /// </summary>
         internal static bool IsSidecarOf(string fileNameWithoutExtension, string basename)
         {
             if (string.IsNullOrEmpty(fileNameWithoutExtension) || string.IsNullOrEmpty(basename))
                 return false;
 
-            // 1) 完全同名：Movie.mkv ↔ Movie.nfo
             if (fileNameWithoutExtension.Equals(basename, StringComparison.OrdinalIgnoreCase))
                 return true;
 
-            // 2) 必须以基名开头，且长于基名
-            if (fileNameWithoutExtension.Length <= basename.Length)
+            if (fileNameWithoutExtension.Length <= basename.Length ||
+                !fileNameWithoutExtension.StartsWith(basename, StringComparison.OrdinalIgnoreCase))
                 return false;
 
-            if (!fileNameWithoutExtension.StartsWith(basename, StringComparison.OrdinalIgnoreCase))
+            var remainder = fileNameWithoutExtension.Substring(basename.Length);
+            if (remainder[0] != '.' && remainder[0] != '-' && remainder[0] != '_' && remainder[0] != ' ')
                 return false;
 
-            // 3) 基名之后的第一个字符必须是分隔符，否则视为另一部影片
-            var boundary = fileNameWithoutExtension[basename.Length];
-            return boundary is ' ' or '.' or '-' or '_' or '[' or '(' or '+';
+            var tokens = remainder
+                .Trim('.', '-', '_', ' ')
+                .Split(new[] { '.', '-', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            return tokens.Length > 0 && tokens.All(IsSidecarToken);
+        }
+
+        private static bool IsSidecarToken(string token)
+        {
+            return SidecarTokens.Contains(token);
         }
 
         private FileSystemMetadata[] GetRelatedPaths(string basename, string folder)
@@ -1809,7 +1829,7 @@ namespace StrmAssistant.Common
             {
                 if (!hasScope || string.IsNullOrWhiteSpace(path)) return true;
                 if (Uri.TryCreate(path, UriKind.Absolute, out var uri) && !uri.IsFile) return true;
-                return scope.Any(root => PathBoundary.IsSameOrDescendant(path, root));
+                return PathBoundary.IsLocalFileInScope(path, scope);
             }
 
             foreach (var workItem in deleteItems)
@@ -1817,8 +1837,7 @@ namespace StrmAssistant.Common
                 var mediaSources =
                     workItem.GetMediaSources(!single, false, _libraryManager.GetLibraryOptions(workItem));
                 mediaSources = mediaSources.Where(s =>
-                        single || (IsLocalPathInScope(s.Path) &&
-                                   scope.Any(p => PathBoundary.IsSameOrDescendant(s.Path, p))))
+                        single || IsLocalPathInScope(s.Path))
                     .ToList();
 
                 var staticMediaSources = Plugin.MediaInfoApi.GetStaticMediaSources(workItem, !single)
