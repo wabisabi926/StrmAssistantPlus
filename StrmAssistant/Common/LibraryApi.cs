@@ -1927,7 +1927,21 @@ namespace StrmAssistant.Common
                 }
             }
 
-            var refreshOptions = Plugin.MetadataApi.GetMetadataFullRefreshOptions();
+            var selectedRefreshOptions = Plugin.Instance.MetadataEnhanceStore.GetOptions().MetadataRefresh.EpisodeRefreshScope?
+                .Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(value => Enum.TryParse<EpisodeRefreshOption>(value.Trim(), true, out var option) ? option : (EpisodeRefreshOption?)null)
+                .Where(option => option.HasValue)
+                .Select(option => option.Value)
+                .ToHashSet() ?? new HashSet<EpisodeRefreshOption>();
+            var refreshMetadata = selectedRefreshOptions.Any(option =>
+                option == EpisodeRefreshOption.NoOverview ||
+                option == EpisodeRefreshOption.NonChineseOverview ||
+                option == EpisodeRefreshOption.DefaultEpisodeName ||
+                option == EpisodeRefreshOption.DefaultSeasonName);
+            var refreshImages = selectedRefreshOptions.Any(option =>
+                option == EpisodeRefreshOption.NoImage ||
+                option == EpisodeRefreshOption.ReplaceCapturedImage);
+            var refreshOptions = Plugin.MetadataApi.GetMetadataRefreshOptions(refreshMetadata, refreshImages);
 
             await _providerManager
                 .RefreshSingleItem(taskItem, refreshOptions, collectionFolders, dummyLibraryOptions,
@@ -1946,8 +1960,10 @@ namespace StrmAssistant.Common
                                                          item.Series.HasProviderId(MetadataProviders.Imdb) ||
                                                          item.Series.HasProviderId(MetadataProviders.Tvdb));
 
-            var needsRefresh = string.IsNullOrWhiteSpace(overview) ||
-                               (episodeRefreshOptions.Contains(EpisodeRefreshOption.NoImage) &&
+            var needsRefresh =
+                (episodeRefreshOptions.Contains(EpisodeRefreshOption.NoOverview) &&
+                 string.IsNullOrWhiteSpace(overview)) ||
+                (episodeRefreshOptions.Contains(EpisodeRefreshOption.NoImage) &&
                                 primaryImageInfo is null) ||
                                (episodeRefreshOptions.Contains(EpisodeRefreshOption.NonChineseOverview) &&
                                 !IsChinese(overview)) ||

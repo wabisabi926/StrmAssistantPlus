@@ -72,6 +72,28 @@ namespace StrmAssistant.Tests
             Assert.True(result.IsHearingImpaired);
         }
 
+        [Fact]
+        public void Normalize_DetectsForcedWithoutLanguage()
+        {
+            var result = SubtitleLanguageNormalizer.Normalize("Movie.forced.srt", "und", null);
+
+            Assert.Null(result.DetectedLabel);
+            Assert.Equal("und", result.Language);
+            Assert.True(result.IsForced);
+            Assert.True(result.HasChange);
+        }
+
+        [Fact]
+        public void Normalize_DetectsHearingImpairedWithoutLanguage()
+        {
+            var result = SubtitleLanguageNormalizer.Normalize("Movie.sdh.srt", "und", null);
+
+            Assert.Null(result.DetectedLabel);
+            Assert.Equal("und", result.Language);
+            Assert.True(result.IsHearingImpaired);
+            Assert.True(result.HasChange);
+        }
+
         [Theory]
         [InlineData("Movie.2020.1080p.srt")]
         [InlineData("Movie.S01E01.2160p.WEB-DL.srt")]

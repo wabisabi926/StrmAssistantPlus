@@ -35,7 +35,7 @@ namespace StrmAssistant.Common
         private readonly IJsonSerializer _jsonSerializer;
         private readonly IHttpClient _httpClient;
 
-        private static readonly LruCache LruCache = new LruCache(20);
+        private static readonly LruCache LruCache = new LruCache(20, TimeSpan.FromHours(6));
         private static long _lastRequestTicks;
 
         public const int RequestIntervalMs = 100;
@@ -63,6 +63,20 @@ namespace StrmAssistant.Common
                 ReplaceAllMetadata = true,
                 ImageRefreshMode = MetadataRefreshMode.FullRefresh,
                 ReplaceAllImages = true,
+                EnableThumbnailImageExtraction = false,
+                EnableSubtitleDownloading = false
+            };
+        }
+
+        public MetadataRefreshOptions GetMetadataRefreshOptions(bool refreshMetadata, bool refreshImages)
+        {
+            return new MetadataRefreshOptions(new DirectoryService(_logger, _fileSystem))
+            {
+                EnableRemoteContentProbe = false,
+                MetadataRefreshMode = refreshMetadata ? MetadataRefreshMode.FullRefresh : MetadataRefreshMode.ValidationOnly,
+                ReplaceAllMetadata = refreshMetadata,
+                ImageRefreshMode = refreshImages ? MetadataRefreshMode.FullRefresh : MetadataRefreshMode.ValidationOnly,
+                ReplaceAllImages = refreshImages,
                 EnableThumbnailImageExtraction = false,
                 EnableSubtitleDownloading = false
             };

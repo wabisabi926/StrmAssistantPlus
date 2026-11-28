@@ -7,16 +7,25 @@ namespace StrmAssistant.Common
     public class LruCache
     {
         private readonly int _capacity;
-        private readonly Dictionary<string, LinkedListNode<KeyValuePair<string, object>>> _cacheMap;
-        private readonly LinkedList<KeyValuePair<string, object>> _orderList;
+        private readonly TimeSpan? _ttl;
+        private readonly Dictionary<string, LinkedListNode<CacheEntry>> _cacheMap;
+        private readonly LinkedList<CacheEntry> _orderList;
         private readonly ReaderWriterLockSlim _lock = new ReaderWriterLockSlim();
 
-        public LruCache(int capacity = 20)
+        private sealed class CacheEntry
+        {
+            public string Key;
+            public object Value;
+            public DateTime ExpiryUtc;
+        }
+
+        public LruCache(int capacity = 20, TimeSpan? ttl = null)
         {
             _capacity = capacity;
-            _cacheMap = new Dictionary<string, LinkedListNode<KeyValuePair<string, object>>>(capacity,
+            _ttl = ttl;
+            _cacheMap = new Dictionary<string, LinkedListNode<CacheEntry>>(capacity,
                 StringComparer.OrdinalIgnoreCase);
-            _orderList = new LinkedList<KeyValuePair<string, object>>();
+            _orderList = new LinkedList<CacheEntry>();
         }
 
         public void AddOrUpdateCache<T>(string key, T value)
@@ -35,8 +44,12 @@ namespace StrmAssistant.Common
                     _cacheMap.Remove(leastUsed.Value.Key);
                 }
 
-                var newNode =
-                    new LinkedListNode<KeyValuePair<string, object>>(new KeyValuePair<string, object>(key, value));
+                var newNode = new LinkedListNode<CacheEntry>(new CacheEntry
+                {
+                    Key = key,
+                    Value = value,
+                    ExpiryUtc = _ttl.HasValue ? DateTime.UtcNow.Add(_ttl.Value) : DateTime.MaxValue
+                });
                 _orderList.AddFirst(newNode);
                 _cacheMap[key] = newNode;
             }
@@ -54,6 +67,13 @@ namespace StrmAssistant.Common
                 value = default;
                 if (_cacheMap.TryGetValue(key, out var node))
                 {
+                    if (node.Value.ExpiryUtc <= DateTime.UtcNow)
+                    {
+                        _orderList.Remove(node);
+                        _cacheMap.Remove(key);
+                        return false;
+                    }
+
                     _orderList.Remove(node);
                     _orderList.AddFirst(node);
 

@@ -3,6 +3,7 @@ using MediaBrowser.Controller.Providers;
 using MediaBrowser.Model.Dto;
 using StrmAssistant.Mod;
 using System;
+using System.IO;
 using System.Reflection;
 using Xunit;
 
@@ -64,6 +65,19 @@ namespace StrmAssistant.Tests
             var dto = new BaseItemDto { Name = "Show.S01E01" };
 
             Assert.False(BeautifyMissingMetadata.ShouldBeautifyEpisode(1, "Show.S01E01", "Show.S01E01", "en-US", dto));
+        }
+
+        [Fact]
+        public void EpisodeRefresh_RespectsSelectedMetadataAndImageScopes()
+        {
+            var root = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", ".."));
+            var library = File.ReadAllText(Path.Combine(root, "StrmAssistant/Common/LibraryApi.cs"));
+            var metadata = File.ReadAllText(Path.Combine(root, "StrmAssistant/Common/MetadataApi.cs"));
+
+            Assert.Contains("episodeRefreshOptions.Contains(EpisodeRefreshOption.NoOverview)", library);
+            Assert.Contains("GetMetadataRefreshOptions(refreshMetadata, refreshImages)", library);
+            Assert.Contains("ReplaceAllMetadata = refreshMetadata", metadata);
+            Assert.Contains("ReplaceAllImages = refreshImages", metadata);
         }
 
         private static void Invoke(Type type, string methodName, params object[] args)

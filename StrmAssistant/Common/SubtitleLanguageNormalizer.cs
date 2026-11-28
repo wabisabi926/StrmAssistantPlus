@@ -186,7 +186,13 @@ namespace StrmAssistant.Common
                 }
             }
 
-            if (result.DetectedLabel == null) return result;
+            if (result.DetectedLabel == null)
+            {
+                result.HasChange =
+                    (result.IsForced.HasValue && result.IsForced.Value != currentIsForced) ||
+                    (result.IsHearingImpaired.HasValue && result.IsHearingImpaired.Value != currentIsHearingImpaired);
+                return result;
+            }
 
             // Title 已有中文说明已被本地化或人工改写，保留原值，只修 Language
             if (string.IsNullOrWhiteSpace(currentTitle) || !LanguageUtility.IsChinese(currentTitle))
