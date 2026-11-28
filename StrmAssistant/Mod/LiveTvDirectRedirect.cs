@@ -127,6 +127,7 @@ namespace StrmAssistant.Mod
                 {
                     foreach (var mediaSource in sources)
                     {
+                        if (!CanMarkDirectPlayable(mediaSource)) continue;
                         mediaSource.RequiresOpening = false;
                         mediaSource.RequiresClosing = false;
                         mediaSource.OpenToken = null;
@@ -145,6 +146,16 @@ namespace StrmAssistant.Mod
             }
 
             return sources;
+        }
+
+        internal static bool CanMarkDirectPlayable(MediaSourceInfo source)
+        {
+            if (source == null || source.RequiresOpening || source.RequiresClosing ||
+                !string.IsNullOrEmpty(source.OpenToken)) return false;
+            if (source.RequiredHttpHeaders != null && source.RequiredHttpHeaders.Count > 0) return false;
+            if (!source.SupportsDirectPlay && !source.SupportsDirectStream) return false;
+            return Uri.TryCreate(source.Path, UriKind.Absolute, out var uri) &&
+                   (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
     }
 }

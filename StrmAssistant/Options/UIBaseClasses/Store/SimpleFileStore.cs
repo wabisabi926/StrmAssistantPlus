@@ -18,6 +18,7 @@
         private readonly ILogger logger;
         private readonly string pluginFullName;
         private readonly object lockObj = new object();
+        private readonly object saveLockObj = new object();
         private readonly IJsonSerializer jsonSerializer;
         private readonly IFileSystem fileSystem;
         private readonly string pluginconfigPath;
@@ -104,46 +105,54 @@
                 throw new ArgumentNullException(nameof(newOptions));
             }
 
-            lock (this.lockObj)
-            {
-                if (this._loadFailed)
-                {
-                    throw new InvalidOperationException("Plugin configuration is corrupt. Repair or remove the file before saving.");
-                }
-            }
-
-            var savingArgs = new FileSavingEventArgs(newOptions);
-            this.FileSaving?.Invoke(this, savingArgs);
-
-            if (savingArgs.Cancel)
-            {
-                return;
-            }
-
-            var tempPath = this.OptionsFilePath + ".tmp-" + Guid.NewGuid().ToString("N");
-            try
+            // 序列化整次保存，确保 FileSaving 记录的变更与 FileSaved 应用的副作用属于同一次配置。
+            lock (this.saveLockObj)
             {
                 lock (this.lockObj)
                 {
-                    using (var stream = this.fileSystem.GetFileStream(tempPath, FileOpenMode.Create, FileAccessMode.Write))
+                    if (this._loadFailed)
                     {
-                        this.jsonSerializer.SerializeToStream(newOptions, stream, new JsonSerializerOptions { Indent = true });
+                        throw new InvalidOperationException("Plugin configuration is corrupt. Repair or remove the file before saving.");
                     }
-
-                    AtomicFileReplacer.Replace(tempPath, this.OptionsFilePath);
-                    this.options = newOptions;
-                    this._loadFailed = false;
                 }
-            }
-            finally
-            {
-                if (File.Exists(tempPath)) File.Delete(tempPath);
-            }
 
-            var savedArgs = new FileSavedEventArgs(newOptions);
-            if (RuntimeActive)
-            {
-                FileSaved?.Invoke(this, savedArgs);
+                // 必须在写入新配置前捕获：关闭插件时新配置会使 RuntimeActive 变为 false，
+                // 但本次保存仍需在落盘后提示重启。
+                var runtimeActive = this.RuntimeActive;
+                var savingArgs = new FileSavingEventArgs(newOptions);
+                this.FileSaving?.Invoke(this, savingArgs);
+
+                if (savingArgs.Cancel)
+                {
+                    return;
+                }
+
+                var tempPath = this.OptionsFilePath + ".tmp-" + Guid.NewGuid().ToString("N");
+                try
+                {
+                    lock (this.lockObj)
+                    {
+                        using (var stream = this.fileSystem.GetFileStream(tempPath, FileOpenMode.Create, FileAccessMode.Write))
+                        {
+                            this.jsonSerializer.SerializeToStream(newOptions, stream, new JsonSerializerOptions { Indent = true });
+                        }
+
+                        AtomicFileReplacer.Replace(tempPath, this.OptionsFilePath);
+                        this.options = newOptions;
+                        this._loadFailed = false;
+                    }
+                }
+                finally
+                {
+                    if (File.Exists(tempPath)) File.Delete(tempPath);
+                }
+
+                // 只有原子替换成功后才通知运行时；写盘失败或 _loadFailed 都不会到达这里。
+                if (runtimeActive)
+                {
+                    var savedArgs = new FileSavedEventArgs(newOptions);
+                    this.FileSaved?.Invoke(this, savedArgs);
+                }
             }
         }
     }

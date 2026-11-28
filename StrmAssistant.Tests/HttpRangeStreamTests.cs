@@ -167,6 +167,30 @@ namespace StrmAssistant.Tests
             Assert.False(string.IsNullOrEmpty(error));
         }
 
+        [Fact]
+        public void WrongContentRange_IsRejected()
+        {
+            var content = BuildContent(1024);
+            using var server = new RangeHttpServer(content, contentRangeOffset: 1);
+
+            Assert.False(HttpRangeStream.TryOpen(server.Url, out var stream, out var error));
+            Assert.Null(stream);
+            Assert.Contains("Content-Range", error);
+        }
+
+        [Fact]
+        public void ShortBlockBody_IsRejected()
+        {
+            var content = BuildContent(2 * 1024 * 1024);
+            using var server = new RangeHttpServer(content, shortBodyBytes: 1024);
+
+            Assert.True(HttpRangeStream.TryOpen(server.Url, out var stream, out var error), error);
+            using (stream)
+            {
+                Assert.Equal(0, stream.Read(new byte[4096], 0, 4096));
+            }
+        }
+
         /// <summary>
         /// 回归（F2）：服务器回了 206 响应头后**不发送正文**时，块读取必须在预算内中止。
         ///
@@ -260,17 +284,22 @@ namespace StrmAssistant.Tests
             private readonly long _length;
             private readonly bool _supportsRange;
             private readonly int _stallBodyMs;
+            private readonly int _contentRangeOffset;
+            private readonly int? _shortBodyBytes;
             private readonly Thread _acceptThread;
             private volatile bool _disposed;
 
             public string Url { get; }
 
-            public RangeHttpServer(byte[] content, bool supportsRange = true, int stallBodyMs = 0)
+            public RangeHttpServer(byte[] content, bool supportsRange = true, int stallBodyMs = 0,
+                int contentRangeOffset = 0, int? shortBodyBytes = null)
             {
                 _content = content;
                 _length = content.Length;
                 _supportsRange = supportsRange;
                 _stallBodyMs = stallBodyMs;
+                _contentRangeOffset = contentRangeOffset;
+                _shortBodyBytes = shortBodyBytes;
 
                 _listener = new TcpListener(IPAddress.Loopback, 0);
                 _listener.Start();
@@ -371,7 +400,10 @@ namespace StrmAssistant.Tests
                     header.Append(hasRange ? "HTTP/1.1 206 Partial Content\r\n" : "HTTP/1.1 200 OK\r\n");
                     header.Append("Accept-Ranges: bytes\r\n");
                     header.Append($"Content-Length: {length}\r\n");
-                    if (hasRange) header.Append($"Content-Range: bytes {start}-{end}/{_length}\r\n");
+                    if (hasRange)
+                    {
+                        header.Append($"Content-Range: bytes {start + _contentRangeOffset}-{end + _contentRangeOffset}/{_length}\r\n");
+                    }
                     header.Append("Connection: close\r\n\r\n");
 
                     var headerBytes = Encoding.ASCII.GetBytes(header.ToString());
@@ -388,9 +420,12 @@ namespace StrmAssistant.Tests
                         return;
                     }
 
+                    var bodyLength = _shortBodyBytes.HasValue
+                        ? Math.Min(_shortBodyBytes.Value, length)
+                        : length;
                     if (_filePath == null)
                     {
-                        stream.Write(_content, (int)start, length);
+                        stream.Write(_content, (int)start, bodyLength);
                     }
                     else
                     {
@@ -399,7 +434,7 @@ namespace StrmAssistant.Tests
                         file.Seek(start, SeekOrigin.Begin);
 
                         var buffer = new byte[64 * 1024];
-                        var remaining = length;
+                        var remaining = bodyLength;
 
                         while (remaining > 0)
                         {

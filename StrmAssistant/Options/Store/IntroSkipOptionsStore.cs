@@ -17,6 +17,7 @@ namespace StrmAssistant.Options.Store
     public class IntroSkipOptionsStore : SimpleFileStore<IntroSkipOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         public IntroSkipOptionsStore(IApplicationHost applicationHost, ILogger logger, string pluginFullName)
             : base(applicationHost, logger, pluginFullName)
@@ -56,6 +57,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is IntroSkipOptions options)
             {
+                _pendingChangedProperties.Clear();
                 if (!RuntimeActive) return;
                 options.Playback.LibraryScope = FilterScope(options.Playback.LibraryScope, options.Playback.LibraryList,
                     nameof(IntroSkipPlaybackOptions.LibraryScope));
@@ -116,7 +118,16 @@ namespace StrmAssistant.Options.Store
                 }
 
                 var changes = PropertyChangeDetector.DetectObjectPropertyChanges(IntroSkipOptions, options);
-                var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+                _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+            }
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (e.Options is IntroSkipOptions options)
+            {
+                var changedProperties = new HashSet<string>(_pendingChangedProperties);
+                _pendingChangedProperties.Clear();
 
                 if (changedProperties.Contains(nameof(IntroSkipPlaybackOptions.EnableIntroSkip)))
                 {
@@ -186,13 +197,7 @@ namespace StrmAssistant.Options.Store
                 {
                     Plugin.IntroDbApi?.UpdateLibraryPathsInScope();
                 }
-            }
-        }
 
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            if (e.Options is IntroSkipOptions options)
-            {
                 _logger.Info("UnlockIntroSkip is set to {0}", options.Fingerprint.UnlockIntroSkip);
                 _logger.Info("IntroDetectionFingerprintMinutes is set to {0}",
                     options.Fingerprint.IntroDetectionFingerprintMinutes);

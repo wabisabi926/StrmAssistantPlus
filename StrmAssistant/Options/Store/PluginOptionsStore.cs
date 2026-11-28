@@ -20,6 +20,7 @@ namespace StrmAssistant.Options.Store
     public class PluginOptionsStore : SimpleFileStore<PluginOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         private bool _currentSuppressOnOptionsSaved;
 
@@ -44,8 +45,8 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is PluginOptions options)
             {
+                _pendingChangedProperties.Clear();
                 if (!RuntimeActive) return;
-                var suppress = _currentSuppressOnOptionsSaved;
 
                 if (string.IsNullOrEmpty(options.TaskConcurrency.CatchupTaskScope))
                 {
@@ -61,11 +62,28 @@ namespace StrmAssistant.Options.Store
                     options.TaskConcurrency.CatchupTaskScope = string.Join(",", selectedTasks);
                 }
 
-                var changes = PropertyChangeDetector.DetectObjectPropertyChanges(PluginOptions, options);
-                var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+                if (PatchManager.EnhanceChineseSearch != null)
+                {
+                    var isSimpleTokenizer = string.Equals(EnhanceChineseSearch.CurrentTokenizerName, "simple",
+                        StringComparison.Ordinal);
+                    options.ChineseSearch.EnhanceChineseSearchRestore =
+                        !options.ChineseSearch.EnhanceChineseSearch && isSimpleTokenizer;
+                }
 
-                // 插件总开关需重启生效：保存时立即提示管理员重启，
-                // 避免「点了关闭但功能还在跑」的困惑（Emby 顶部会弹出重启提示）。
+                var changes = PropertyChangeDetector.DetectObjectPropertyChanges(PluginOptions, options);
+                _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+            }
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (e.Options is PluginOptions options)
+            {
+                var changedProperties = new HashSet<string>(_pendingChangedProperties);
+                _pendingChangedProperties.Clear();
+                var suppress = _currentSuppressOnOptionsSaved;
+
+                // 插件总开关需重启生效：配置落盘后再提示管理员重启。
                 if (changedProperties.Contains(nameof(PluginOptions.EnablePlugin)))
                 {
                     _logger.Info("EnablePlugin changed to {0} - a server restart is required to take effect",
@@ -73,7 +91,8 @@ namespace StrmAssistant.Options.Store
                     Plugin.Instance.ApplicationHost.NotifyPendingRestart();
                 }
 
-                if (changedProperties.Contains(nameof(PluginOptions.TaskConcurrency.CatchupMode)))                {
+                if (changedProperties.Contains(nameof(PluginOptions.TaskConcurrency.CatchupMode)))
+                {
                     if (options.TaskConcurrency.CatchupMode)
                     {
                         QueueManager.Initialize();
@@ -122,16 +141,12 @@ namespace StrmAssistant.Options.Store
                         options.Memory.MemoryAutoRestartThresholdMB);
                 }
 
-                if (PatchManager.EnhanceChineseSearch != null)
+                if (changedProperties.Contains(nameof(ChineseSearchOptions.EnhanceChineseSearch)))
                 {
                     var isSimpleTokenizer = string.Equals(EnhanceChineseSearch.CurrentTokenizerName, "simple",
                         StringComparison.Ordinal);
-                    options.ChineseSearch.EnhanceChineseSearchRestore =
-                        !options.ChineseSearch.EnhanceChineseSearch && isSimpleTokenizer;
-
-                    if (changedProperties.Contains(nameof(ChineseSearchOptions.EnhanceChineseSearch)) &&
-                        ((!options.ChineseSearch.EnhanceChineseSearch && isSimpleTokenizer) ||
-                         (options.ChineseSearch.EnhanceChineseSearch && !isSimpleTokenizer)))
+                    if ((!options.ChineseSearch.EnhanceChineseSearch && isSimpleTokenizer) ||
+                        (options.ChineseSearch.EnhanceChineseSearch && !isSimpleTokenizer))
                     {
                         Plugin.Instance.ApplicationHost.NotifyPendingRestart();
                     }
@@ -155,14 +170,6 @@ namespace StrmAssistant.Options.Store
                 {
                     _logger.Info("DigitsAsTmdbId is set to {0}", options.ChineseSearch.DigitsAsTmdbId);
                 }
-            }
-        }
-
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            if (e.Options is PluginOptions options)
-            {
-                var suppress = _currentSuppressOnOptionsSaved;
 
                 if (!suppress)
                 {

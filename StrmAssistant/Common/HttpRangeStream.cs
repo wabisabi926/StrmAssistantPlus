@@ -163,20 +163,22 @@ namespace StrmAssistant.Common
                     return false;
                 }
 
-                if (response.Content.Headers.ContentRange?.Length is long total && total > 0)
+                var contentRange = response.Content.Headers.ContentRange;
+                if (contentRange?.From != 0 || contentRange.To != 0 ||
+                    contentRange.Length is not long total || total <= 0)
                 {
-                    length = total;
-                    return true;
+                    error = "invalid Content-Range probe response";
+                    return false;
                 }
 
-                if (headLength.HasValue)
+                if (headLength.HasValue && headLength.Value != total)
                 {
-                    length = headLength.Value;
-                    return true;
+                    error = "HEAD and Range lengths differ";
+                    return false;
                 }
 
-                error = "Content-Range missing length";
-                return false;
+                length = total;
+                return true;
             }
             catch (Exception e)
             {
@@ -312,6 +314,21 @@ namespace StrmAssistant.Common
                         return null;
                     }
 
+                    var contentRange = response.Content.Headers.ContentRange;
+                    if (contentRange?.From != start || contentRange.To != end || contentRange.Length != _length)
+                    {
+                        Plugin.Instance?.Logger.Debug(
+                            $"HttpRangeStream - block {index} returned an invalid Content-Range");
+                        return null;
+                    }
+
+                    if (response.Content.Headers.ContentLength is long contentLength && contentLength != expected)
+                    {
+                        Plugin.Instance?.Logger.Debug(
+                            $"HttpRangeStream - block {index} returned an invalid Content-Length");
+                        return null;
+                    }
+
                     using var source = response.Content.ReadAsStream();
                     var buffer = new byte[expected];
                     var read = 0;
@@ -328,13 +345,14 @@ namespace StrmAssistant.Common
                         cts.CancelAfter(ReadIdleTimeout);
                     }
 
-                    if (read == 0) return null;
-                    if (read == expected) return buffer;
+                    if (read != expected)
+                    {
+                        Plugin.Instance?.Logger.Debug(
+                            $"HttpRangeStream - block {index} short read: {read}/{expected} bytes");
+                        return null;
+                    }
 
-                    // 短读：截断到实际长度返回（末尾块可能短于块大小）
-                    var trimmed = new byte[read];
-                    Buffer.BlockCopy(buffer, 0, trimmed, 0, read);
-                    return trimmed;
+                    return buffer;
                 }
                 catch (OperationCanceledException)
                 {

@@ -490,6 +490,9 @@ namespace StrmAssistant.Mod
         {
             if (state == null) return false;
             if (!(GetPropertyValue<MediaSourceInfo>(state, "MediaSource") is { } mediaSource)) return false;
+            if (mediaSource.RequiredHttpHeaders != null && mediaSource.RequiredHttpHeaders.Count > 0) return false;
+            if (!Uri.TryCreate(mediaSource.Path, UriKind.Absolute, out var sourceUri) ||
+                (sourceUri.Scheme != Uri.UriSchemeHttp && sourceUri.Scheme != Uri.UriSchemeHttps)) return false;
 
             if (isVideo)
             {
@@ -516,11 +519,7 @@ namespace StrmAssistant.Mod
                 return false;
             }
 
-            if (mediaSource.RequiredHttpHeaders != null && mediaSource.RequiredHttpHeaders.Count > 0) return false;
-
-            return Uri.TryCreate(mediaSource.Path, UriKind.Absolute, out var uri) &&
-                   (string.Equals(uri.Scheme, Uri.UriSchemeHttp, StringComparison.OrdinalIgnoreCase) ||
-                    string.Equals(uri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase));
+            return true;
         }
 
         private static void DisposeState(object state)
@@ -590,35 +589,11 @@ namespace StrmAssistant.Mod
             return result;
         }
 
-        private static string NormalizeRedirectUrl(string url)
+        internal static string NormalizeRedirectUrl(string url)
         {
-            if (string.IsNullOrWhiteSpace(url)) return url;
-
-            var queryIndex = url.IndexOf('?');
-            if (queryIndex < 0)
-            {
-                return Uri.TryCreate(url, UriKind.Absolute, out var absolute) ? absolute.AbsoluteUri : url;
-            }
-
-            var basePart = url.Substring(0, queryIndex);
-            var query = queryIndex + 1 < url.Length ? url.Substring(queryIndex + 1) : string.Empty;
-
-            if (!Uri.TryCreate(basePart, UriKind.Absolute, out var baseUri)) return url;
-
-            var normalizedQuery = string.Join("&", query.Split('&', StringSplitOptions.RemoveEmptyEntries)
-                .Select(pair =>
-                {
-                    var equalsIndex = pair.IndexOf('=');
-                    if (equalsIndex < 0) return Uri.EscapeDataString(Uri.UnescapeDataString(pair));
-
-                    var key = pair.Substring(0, equalsIndex);
-                    var value = equalsIndex + 1 < pair.Length ? pair.Substring(equalsIndex + 1) : string.Empty;
-
-                    return Uri.EscapeDataString(Uri.UnescapeDataString(key)) + "=" +
-                           Uri.EscapeDataString(Uri.UnescapeDataString(value));
-                }));
-
-            return new UriBuilder(baseUri) { Query = normalizedQuery }.Uri.AbsoluteUri;
+            if (string.IsNullOrWhiteSpace(url)) return null;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+            return uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps ? url : null;
         }
 
         private static bool IsClientBlocked(IRequest requestContext, bool isVideo)

@@ -15,6 +15,7 @@ namespace StrmAssistant.Options.Store
     public class ExperienceEnhanceOptionsStore : SimpleFileStore<ExperienceEnhanceOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         private bool _currentSuppressOnOptionsSaved;
 
@@ -39,6 +40,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is ExperienceEnhanceOptions options)
             {
+                _pendingChangedProperties.Clear();
                 if (!RuntimeActive) return;
                 if (string.IsNullOrEmpty(options.ItemDisplay.HidePersonPreference))
                 {
@@ -46,7 +48,17 @@ namespace StrmAssistant.Options.Store
                 }
 
                 var changes = PropertyChangeDetector.DetectObjectPropertyChanges(ExperienceEnhanceOptions, options);
-                var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+                _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+            }
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (e.Options is ExperienceEnhanceOptions options)
+            {
+                var changedProperties = new HashSet<string>(_pendingChangedProperties);
+                _pendingChangedProperties.Clear();
+                var suppress = _currentSuppressOnOptionsSaved;
 
                 if (changedProperties.Contains(nameof(VersionMergeOptions.MergeMultiVersion)))
                 {
@@ -266,14 +278,6 @@ namespace StrmAssistant.Options.Store
                         PatchManager.ShowCollectionsFromSeasons.Unpatch();
                     }
                 }
-            }
-        }
-
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            if (e.Options is ExperienceEnhanceOptions options)
-            {
-                var suppress = _currentSuppressOnOptionsSaved;
 
                 if (!suppress)
                 {

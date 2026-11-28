@@ -19,6 +19,7 @@ namespace StrmAssistant.Options.Store
     public class NetworkProxyOptionsStore : SimpleFileStore<NetworkProxyOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         public NetworkProxyOptionsStore(IApplicationHost applicationHost, ILogger logger, string pluginFullName)
             : base(applicationHost, logger, pluginFullName)
@@ -26,6 +27,7 @@ namespace StrmAssistant.Options.Store
             _logger = logger;
 
             FileSaving += OnFileSaving;
+            FileSaved += OnFileSaved;
         }
 
         public NetworkProxyOptions NetworkProxyOptions => GetOptions();
@@ -38,6 +40,7 @@ namespace StrmAssistant.Options.Store
         private void OnFileSaving(object sender, FileSavingEventArgs e)
         {
             if (!(e.Options is NetworkProxyOptions options)) return;
+            _pendingChangedProperties.Clear();
             if (!RuntimeActive) return;
 
             var network = options.Network;
@@ -75,7 +78,32 @@ namespace StrmAssistant.Options.Store
             }
 
             var changes = PropertyChangeDetector.DetectObjectPropertyChanges(NetworkProxyOptions, options);
-            var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+            _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+
+            // 直链字段位于嵌套对象中；在写盘前显式记录比较结果，供 FileSaved 应用。
+            var oldDirectLink = NetworkProxyOptions.DirectLink ?? new DirectLinkOptions();
+            var newDirectLink = options.DirectLink ?? new DirectLinkOptions();
+            if (oldDirectLink.EnableStrmDirectRedirect != newDirectLink.EnableStrmDirectRedirect)
+                _pendingChangedProperties.Add(nameof(DirectLinkOptions.EnableStrmDirectRedirect));
+            if (oldDirectLink.StrmDirectRedirectFollow302 != newDirectLink.StrmDirectRedirectFollow302)
+                _pendingChangedProperties.Add(nameof(DirectLinkOptions.StrmDirectRedirectFollow302));
+            if (!string.Equals(oldDirectLink.StrmVideoDirectRedirectClientBlacklist,
+                    newDirectLink.StrmVideoDirectRedirectClientBlacklist))
+                _pendingChangedProperties.Add(nameof(DirectLinkOptions.StrmVideoDirectRedirectClientBlacklist));
+            if (!string.Equals(oldDirectLink.StrmAudioDirectRedirectClientBlacklist,
+                    newDirectLink.StrmAudioDirectRedirectClientBlacklist))
+                _pendingChangedProperties.Add(nameof(DirectLinkOptions.StrmAudioDirectRedirectClientBlacklist));
+            if (oldDirectLink.EnableLiveTvDirectRedirect != newDirectLink.EnableLiveTvDirectRedirect)
+                _pendingChangedProperties.Add(nameof(DirectLinkOptions.EnableLiveTvDirectRedirect));
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (!(e.Options is NetworkProxyOptions options)) return;
+            var changedProperties = new HashSet<string>(_pendingChangedProperties);
+            _pendingChangedProperties.Clear();
+            var network = options.Network;
+            var tmdb = options.TmdbReplacement;
 
             // 代理服务器
             if (changedProperties.Contains(nameof(NetworkOptions.EnableProxyServer)))
@@ -116,23 +144,20 @@ namespace StrmAssistant.Options.Store
                 }
             }
 
-            // 影音直链：直接比较新旧值，避免依赖嵌套层级的变更检测
+            // 影音直链：使用 FileSaving 记录的变更，避免落盘后新旧对象已相同。
             try
             {
-                var oldDirectLink = NetworkProxyOptions.DirectLink ?? new DirectLinkOptions();
                 var newDirectLink = options.DirectLink ?? new DirectLinkOptions();
 
-                if (oldDirectLink.EnableStrmDirectRedirect != newDirectLink.EnableStrmDirectRedirect ||
-                    oldDirectLink.StrmDirectRedirectFollow302 != newDirectLink.StrmDirectRedirectFollow302 ||
-                    !string.Equals(oldDirectLink.StrmVideoDirectRedirectClientBlacklist,
-                        newDirectLink.StrmVideoDirectRedirectClientBlacklist) ||
-                    !string.Equals(oldDirectLink.StrmAudioDirectRedirectClientBlacklist,
-                        newDirectLink.StrmAudioDirectRedirectClientBlacklist))
+                if (changedProperties.Contains(nameof(DirectLinkOptions.EnableStrmDirectRedirect)) ||
+                    changedProperties.Contains(nameof(DirectLinkOptions.StrmDirectRedirectFollow302)) ||
+                    changedProperties.Contains(nameof(DirectLinkOptions.StrmVideoDirectRedirectClientBlacklist)) ||
+                    changedProperties.Contains(nameof(DirectLinkOptions.StrmAudioDirectRedirectClientBlacklist)))
                 {
                     PatchManager.StrmDirectRedirect?.ApplyOptionsAndConfigure(newDirectLink);
                 }
 
-                if (oldDirectLink.EnableLiveTvDirectRedirect != newDirectLink.EnableLiveTvDirectRedirect)
+                if (changedProperties.Contains(nameof(DirectLinkOptions.EnableLiveTvDirectRedirect)))
                 {
                     PatchManager.LiveTvDirectRedirect?.ApplyOptionsAndConfigure(newDirectLink);
                 }

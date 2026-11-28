@@ -15,6 +15,7 @@ namespace StrmAssistant.Options.Store
     public class MetadataEnhanceOptionsStore : SimpleFileStore<MetadataEnhanceOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         public MetadataEnhanceOptionsStore(IApplicationHost applicationHost, ILogger logger, string pluginFullName)
             : base(applicationHost, logger, pluginFullName)
@@ -31,6 +32,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is MetadataEnhanceOptions options)
             {
+                _pendingChangedProperties.Clear();
                 if (!RuntimeActive) return;
                 if (string.IsNullOrEmpty(options.ChineseMetadata.FallbackLanguages))
                 {
@@ -63,7 +65,16 @@ namespace StrmAssistant.Options.Store
                 }
 
                 var changes = PropertyChangeDetector.DetectObjectPropertyChanges(MetadataEnhanceOptions, options);
-                var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+                _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+            }
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (e.Options is MetadataEnhanceOptions options)
+            {
+                var changedProperties = new HashSet<string>(_pendingChangedProperties);
+                _pendingChangedProperties.Clear();
 
                 if (changedProperties.Contains(nameof(ChineseMetadataOptions.ChineseMovieDb)))
                 {
@@ -224,13 +235,7 @@ namespace StrmAssistant.Options.Store
                         PatchManager.LocalTmdbCache.Unpatch();
                     }
                 }
-            }
-        }
 
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            if (e.Options is MetadataEnhanceOptions options)
-            {
                 _logger.Info("ChineseMovieDb is set to {0}", options.ChineseMetadata.ChineseMovieDb);
                 _logger.Info("MovieDbFallbackLanguages is set to {0}", options.ChineseMetadata.FallbackLanguages);
                 _logger.Info("ChineseTvdb is set to {0}", options.ChineseMetadata.ChineseTvdb);

@@ -16,6 +16,7 @@ namespace StrmAssistant.Options.Store
     public class MediaInfoExtractOptionsStore : SimpleFileStore<MediaInfoExtractOptions>
     {
         private readonly ILogger _logger;
+        private readonly HashSet<string> _pendingChangedProperties = new HashSet<string>();
 
         public MediaInfoExtractOptionsStore(IApplicationHost applicationHost, ILogger logger, string pluginFullName)
             : base(applicationHost, logger, pluginFullName)
@@ -32,6 +33,7 @@ namespace StrmAssistant.Options.Store
         {
             if (e.Options is MediaInfoExtractOptions options)
             {
+                _pendingChangedProperties.Clear();
                 if (!RuntimeActive) return;
                 // 自定义 ffmpeg/ffprobe 路径保存期校验：不存在时立即告警，避免用户以为已生效
                 foreach (var (label, path) in new[]
@@ -69,7 +71,16 @@ namespace StrmAssistant.Options.Store
                 options.ExtractionPerformance.ExclusiveControlFeatures = string.Join(",", selectedFeatures);
 
                 var changes = PropertyChangeDetector.DetectObjectPropertyChanges(MediaInfoExtractOptions, options);
-                var changedProperties = new HashSet<string>(changes.Select(c => c.PropertyName));
+                _pendingChangedProperties.UnionWith(changes.Select(c => c.PropertyName));
+            }
+        }
+
+        private void OnFileSaved(object sender, FileSavedEventArgs e)
+        {
+            if (e.Options is MediaInfoExtractOptions options)
+            {
+                var changedProperties = new HashSet<string>(_pendingChangedProperties);
+                _pendingChangedProperties.Clear();
 
                 if (changedProperties.Contains(nameof(MediaInfoPersistOptions.PersistMediaInfoMode)))
                 {
@@ -145,13 +156,7 @@ namespace StrmAssistant.Options.Store
                     Common.FfmpegPathOverride.Apply(options.IsoTool.CustomProbePath,
                         options.IsoTool.CustomEncoderPath);
                 }
-            }
-        }
 
-        private void OnFileSaved(object sender, FileSavedEventArgs e)
-        {
-            if (e.Options is MediaInfoExtractOptions options)
-            {
                 _logger.Info("PersistMediaInfoMode is set to {0}", options.MediaInfoPersist.PersistMediaInfoMode);
                 _logger.Info("MediaInfoJsonRootFolder is set to {0}",
                     !string.IsNullOrEmpty(options.MediaInfoPersist.MediaInfoJsonRootFolder)
