@@ -17,18 +17,26 @@ Community Edition based on StrmAssistant, continuously adapted to the latest Emb
 
 | Item | Value |
 |---|---|
-| Plugin Version | **4.0.1.2** |
+| Plugin Version | **4.0.1.3** |
 | Minimum Emby Version | 4.9.1.0 |
 | Advertised Version | 4.11.0.19 |
 | Tested On | 4.10.2.0 / 4.11.0.19 |
 | Target Framework | .NET 6.0 |
-| Architecture | x64 (tested in this round) / ARM64 (legacy path retained) |
+| Architecture | x64 (fully tested) / ARM64 (NAS basic deployment and self-check passed) |
 
 > See [CHANGELOG.md](CHANGELOG.md) for per-version details.
 
 > **Before upgrading to 4.0**: legacy config migrations are no longer bundled. Direct upgrade is supported only from **3.0.0.78 or later**. If you are on an older version, install 3.0.0.78 and start Emby once to complete the migration, then upgrade to 4.0.
 
-## Latest Optimizations (v3.0.0.66 ~ v4.0.1.2)
+## Latest Optimizations (v3.0.0.66 ~ v4.0.1.3)
+
+✅ **Emby 4.11 adaptation and settings cleanup (4.0.1.3)**
+- Restores MovieDb, DTO, Chinese search, ISO, screenshots, chapter protection, external subtitles, and box-set blocking on Emby 4.11
+- Adds authorized delete previews, rollback on failure, symlink boundary checks, and clearer batch-operation feedback
+- Fixes STRM intro/credits detection, marker protection, multi-source JSON restore, and cancellation propagation
+- Regroups settings and narrows community-rating and Emby 4.11 visibility by source and server version
+- Removes page subtitles and idle empty result boxes, hides the legacy fingerprint task on 4.11, and aligns task names with episode-level refresh
+- Passes basic ARM64 NAS deployment: module initialization, health check, and ffprobe self-check
 
 ✅ **Intro/credits clearing and movie coverage (4.0.1.2)**
 - Clear Intro & Credits Markers no longer depends on Enable Intro Skip; online scraping or fingerprint detection alone is enough
@@ -300,7 +308,7 @@ The plugin adapts dynamically: it detects the Emby version at startup, prefers H
 | Architecture | Status | Notes |
 |---|---|---|
 | x86-64 / x64 | ✅ Tested in this round | 4.10.2.0 and 4.11.0.19 |
-| ARM64 / aarch64 | ⚠️ Legacy path retained | Not revalidated in this round |
+| ARM64 / aarch64 | 🟢 NAS basic acceptance passed | 43 modules initialized, Healthy, ffprobe self-check passed; 4.0.1.3 candidate hash pending confirmation |
 
 ### Emby 4.11 capability boundaries
 
@@ -308,7 +316,7 @@ The plugin adapts dynamically: it detects the Emby version at startup, prefers H
 - **Alternative implementations**: batch DTO filtering uses model setters; intro detection uses native MarkerDetector; discovery overrides use serialization; image capture has a direct-extraction fallback.
 - **Currently unavailable**: plugin fingerprint task, series notification summaries, and `-skip_frame` keyframe optimization.
 - **Limited**: ExclusiveExtract is off by default and retains limited mode only on 4.11; numeric/provider-ID search enhancements are disabled; no global `SaveChapters` protection hook; deep delete handles local targets only and keeps empty folders.
-- **Not yet validated**: real multi-m2ts local ISO, weak-network sampling, and Emby 4.9/ARM64. Real STRM intro detection passed; synthetic STRM credits detection passed for both local files and local HTTP Range sources, with markers written successfully. Credits detection on the real NAS source still awaits network restoration. BDMV is not supported.
+- **Not yet validated**: full feature parity of the 4.0.1.3 candidate on ARM64. Basic ARM64 NAS deployment and self-checks passed. Real multi-m2ts local ISO and weak-network sampling passed locally; real STRM intro detection and synthetic STRM credits detection also passed. Emby 4.9 is no longer a target, and BDMV is not supported.
 
 > ISO extraction: Emby's third-party `IsoMounter` plugin is incompatible with 4.10 and blocks ISO probing; disable or remove it. This plugin does not depend on it. Local ISOs need no mount on Linux/Docker, and Windows falls back to title sampling when mounting fails.
 
