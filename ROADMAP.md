@@ -4,15 +4,14 @@
 
 约定：完成一项就删掉对应小节，并把行为变更写进 `CHANGELOG.md`。
 
-## 🚧 4.0.1.3 发版准备（2026-11-28）
+## ✅ 4.0.1.3 已发布（2026-11-28）
 
-- CHANGELOG、README 中英文、ROADMAP 与本地交接文档已按 **4.0.1.3** 整理，工程版本号已提升至 4.0.1.3。
-- 最终候选 DLL SHA-256 `ce9245d5a0659b36f723a9171af29f0c212067697510599b1d5db8912fd6ad0e`，全量 **848/848** 测试通过，Release 构建 0 警告 0 错误。
-- 设置页与显隐修复已提交并推送：`10816b6`（代码与测试）、`f09ed3f`（文档）。
-- 4.11 已完成 Edge 运行时验收：顶部空框消失、内存分组合并、页面描述清空、按钮与计划任务名称一致；旧指纹任务隐藏随最终 DLL 重启后生效。
-- 4.10 本轮未重复完整验收；ARM64 NAS 基础部署通过：43 个模块初始化、Healthy、ffprobe 自检成功、后台任务 Idle，17:15 前无新增插件异常。用户确认 ARM64 基本测试暂未发现问题；因未提供 DLL 哈希，4.0.1.3 候选的 ARM64 验收仍待确认。
+- 发布提交 `cfb5085`，tag `v4.0.1.3`；CI run [`46131759145`](https://github.com/wabisabi926/StrmAssistantPlus/actions/runs/46131759145) 成功。
+- Release [`StrmAssistantPlus v4.0.1.3`](https://github.com/wabisabi926/StrmAssistantPlus/releases/tag/v4.0.1.3) 已发布，资产 `StrmAssistantPlus_v4.0.1.3.dll`（8,344,576 B，SHA-256 `058caf890ba184e6db04016f71503dc6755782fd6d9fc3ded396f9dd3baf6eb6`）。
+- 本地最终构建 SHA-256 `ce9245d5a0659b36f723a9171af29f0c212067697510599b1d5db8912fd6ad0e`；跨机器 CI 产物哈希不同，但 Assembly/File/Product Version 均为 4.0.1.3。
+- 全量 **848/848** 测试通过，Release 构建 0 警告 0 错误；4.11 Edge 设置页与计划任务运行时验收通过。
+- ARM64 NAS 基础部署通过：43 个模块初始化、Healthy、ffprobe 自检成功、后台任务 Idle；用户确认基本测试暂未发现问题。因未提供 NAS DLL 哈希，4.0.1.3 的 ARM64 完整功能一致性仍未承诺。
 - ARM64 环境观察：豆瓣连续反爬后按设计熔断 6 小时，建议配置有效 Cookie 或暂停豆瓣刮削；TMDB 域名超时属于 NAS 代理/DNS/外网路由问题；IntroDB 连续 50 集无数据后跳过为预期行为，启动 503、FFmpeg 空错误输出与 NVENC 检测失败可忽略。
-- 发版前待办：提交推送版本发布提交 → 打 `v4.0.1.3` tag → CI 构建并发布 Release。
 
 ## ✅ Emby 4.11 适配主线已完成（2026-11-26）
 
