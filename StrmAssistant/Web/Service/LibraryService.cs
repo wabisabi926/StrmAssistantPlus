@@ -84,12 +84,18 @@ namespace StrmAssistant.Web.Service
             }
 
             var allMountPaths = new Dictionary<string, bool?>();
+            var authorizedDeleteScopes = new List<string[]>();
             var deleteFiles = new List<string>();
             var metadataDirectories = new List<string>();
 
             foreach (var deleteItem in deleteItems)
             {
-                foreach (var path in Plugin.LibraryApi.GetDeletePaths(deleteItem).Where(p => !p.IsDirectory))
+                var deleteScope = GetDeepDeleteScope(deleteItem);
+                if (deleteScope.Length > 0) authorizedDeleteScopes.Add(deleteScope);
+                foreach (var path in Plugin.LibraryApi.GetDeletePaths(deleteItem)
+                             .Where(p => !p.IsDirectory &&
+                                         (deleteScope.Length == 0 ||
+                                          PathBoundary.IsLocalFileInScope(p.FullName, deleteScope))))
                 {
                     deleteFiles.Add(path.FullName);
                 }
@@ -114,7 +120,11 @@ namespace StrmAssistant.Web.Service
             {
                 foreach (var mountPath in allMountPaths.Where(p => p.Value is true).Select(p => p.Key))
                 {
-                    foreach (var path in Plugin.LibraryApi.GetDeletePaths(mountPath).Where(p => !p.IsDirectory))
+                    foreach (var path in Plugin.LibraryApi.GetDeletePaths(mountPath)
+                                 .Where(p => !p.IsDirectory &&
+                                             (authorizedDeleteScopes.Count == 0 ||
+                                              authorizedDeleteScopes.Any(scope =>
+                                                  PathBoundary.IsLocalFileInScope(p.FullName, scope)))))
                     {
                         deleteFiles.Add(path.FullName);
                     }

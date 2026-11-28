@@ -24,6 +24,7 @@ namespace StrmAssistant.Tests
             Assert.Contains("VersionDeletePlanner.Build(item, candidates, CanDeleteItem)", source);
             Assert.Contains("deletePlan.IsDenied || deletePlan.UnauthorizedCount > 0", source);
             Assert.Contains("VersionDeleteTransaction.Execute", source);
+            Assert.Contains("PathBoundary.IsLocalFileInScope(p.FullName, deleteScope)", source);
             Assert.DoesNotContain("_fileSystem.DeleteFile", source);
         }
 
