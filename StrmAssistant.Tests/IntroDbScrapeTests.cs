@@ -1,6 +1,7 @@
 using MediaBrowser.Controller.Entities.TV;
 using MediaBrowser.Model.Entities;
 using StrmAssistant.Common;
+using StrmAssistant.ScheduledTask;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -48,6 +49,22 @@ namespace StrmAssistant.Tests
         public void ParseNoDataCode_ReturnsNullWhenNoUsableCode(string body)
         {
             Assert.Null(IntroDbApi.ParseNoDataCode(body));
+        }
+
+        [Fact]
+        public void MovieQuery_AppliesScrapeLibraryScope()
+        {
+            var query = ScrapeIntroDbTask.CreateMovieQuery(new[] { @"D:\MoviesA", @"D:\MoviesB" });
+
+            Assert.Equal(new[] { @"D:\MoviesA", @"D:\MoviesB" }, query.PathStartsWithAny);
+        }
+
+        [Fact]
+        public void MovieQuery_NoScopeKeepsAllMovies()
+        {
+            var query = ScrapeIntroDbTask.CreateMovieQuery(Array.Empty<string>());
+
+            Assert.Empty(query.PathStartsWithAny);
         }
 
         [Fact]

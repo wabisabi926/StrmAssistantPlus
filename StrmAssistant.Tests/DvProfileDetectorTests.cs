@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using MediaBrowser.Model.Entities;
+using MediaBrowser.Model.MediaInfo;
 using StrmAssistant.Common;
+using StrmAssistant.Mod;
 using Xunit;
 
 namespace StrmAssistant.Tests
@@ -155,6 +157,70 @@ namespace StrmAssistant.Tests
                 new[] { baseLayer, enhancementLayer }, out var found, out _));
 
             Assert.Same(enhancementLayer, found);
+        }
+
+        [Fact]
+        public void Tagging_AllowsGeometryOnlyForExactMpegTsPair()
+        {
+            var baseLayer = Video(3840, 2160, "hevc", ExtendedVideoTypes.Hdr10);
+            var enhancementLayer = Video(1920, 1080);
+            var mediaInfo = new MediaInfo
+            {
+                Container = "mpegts",
+                MediaStreams = new List<MediaStream> { baseLayer, enhancementLayer }
+            };
+
+            Assert.True(DolbyVisionProfile.TryTagDualLayer(mediaInfo, out _));
+            Assert.Equal(ExtendedVideoTypes.DolbyVision, enhancementLayer.ExtendedVideoType);
+            Assert.Equal(ExtendedVideoSubTypes.DoviProfile76, enhancementLayer.ExtendedVideoSubType);
+        }
+
+        [Fact]
+        public void Tagging_RejectsMkvGeometryWithoutDoviEvidence()
+        {
+            var baseLayer = Video(3840, 2160, "hevc", ExtendedVideoTypes.Hdr10);
+            var enhancementLayer = Video(1920, 1080);
+            var mediaInfo = new MediaInfo
+            {
+                Container = "mkv",
+                MediaStreams = new List<MediaStream> { baseLayer, enhancementLayer }
+            };
+
+            Assert.False(DolbyVisionProfile.TryTagDualLayer(mediaInfo, out _));
+            Assert.Equal(ExtendedVideoTypes.None, enhancementLayer.ExtendedVideoType);
+        }
+
+        [Fact]
+        public void Tagging_RejectsExtraVideoTrackWithoutDoviEvidence()
+        {
+            var baseLayer = Video(3840, 2160, "hevc", ExtendedVideoTypes.Hdr10);
+            var enhancementLayer = Video(1920, 1080);
+            var extra = Video(1280, 720, "hevc", ExtendedVideoTypes.Hdr10);
+            var mediaInfo = new MediaInfo
+            {
+                Container = "mpegts",
+                MediaStreams = new List<MediaStream> { baseLayer, enhancementLayer, extra }
+            };
+
+            Assert.False(DolbyVisionProfile.TryTagDualLayer(mediaInfo, out _));
+            Assert.Equal(ExtendedVideoTypes.None, enhancementLayer.ExtendedVideoType);
+        }
+
+        [Fact]
+        public void Tagging_PreservesExistingDoviProfile()
+        {
+            var baseLayer = Video(3840, 2160, "hevc", ExtendedVideoTypes.Hdr10);
+            var enhancementLayer = Video(1920, 1080);
+            enhancementLayer.ExtendedVideoType = ExtendedVideoTypes.DolbyVision;
+            enhancementLayer.ExtendedVideoSubType = ExtendedVideoSubTypes.DoviProfile81;
+            var mediaInfo = new MediaInfo
+            {
+                Container = "mpegts",
+                MediaStreams = new List<MediaStream> { baseLayer, enhancementLayer }
+            };
+
+            Assert.False(DolbyVisionProfile.TryTagDualLayer(mediaInfo, out _));
+            Assert.Equal(ExtendedVideoSubTypes.DoviProfile81, enhancementLayer.ExtendedVideoSubType);
         }
     }
 }

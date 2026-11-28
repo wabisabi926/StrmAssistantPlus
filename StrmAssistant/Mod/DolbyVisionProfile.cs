@@ -3,6 +3,7 @@ using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.MediaInfo;
 using StrmAssistant.Common;
 using System;
+using System.Linq;
 using System.Reflection;
 using static StrmAssistant.Mod.PatchManager;
 
@@ -16,6 +17,7 @@ namespace StrmAssistant.Mod
     /// <c>MediaStreams</c> 已就绪，适合做一次只读的几何判定。
     ///
     /// 命中条件见 <see cref="DvProfileDetector"/>：HDR10 HEVC 基础层 + 半宽半高的 HEVC 增强层。
+    /// 没有 DOVI 证据时仅接受恰好两条视频流的 MPEG-TS 几何配对；已有 DV 标签始终保留。
     /// 命中后把**增强层**写为 Dolby Vision Profile 7 —— 与 Emby 对双层 DV 的展示语义一致：
     /// 基础层保持 HDR10，增强层承载 DV 标记。
     ///
@@ -82,31 +84,76 @@ namespace StrmAssistant.Mod
         {
             try
             {
-                if (isAudio || __result?.MediaStreams == null) return;
-
-                var logger = Plugin.Instance.Logger;
-
-                if (!DvProfileDetector.TryDetectDualLayerProfile7(__result.MediaStreams, out var enhancementLayer,
-                        out var reason))
+                string reason = null;
+                if (isAudio || !TryTagDualLayer(__result, out reason))
                 {
-                    // 未命中的原因仅 Debug 输出，避免每次探测都刷 Info 日志
-                    if (Plugin.Instance.DebugMode)
+                    if (Plugin.Instance.DebugMode && !string.IsNullOrEmpty(reason))
                     {
-                        logger.Debug($"DolbyVisionProfile - no dual-layer DV P7: {reason}");
+                        Plugin.Instance.Logger.Debug($"DolbyVisionProfile - no dual-layer DV P7: {reason}");
                     }
 
                     return;
                 }
 
-                enhancementLayer.ExtendedVideoType = ExtendedVideoTypes.DolbyVision;
-                enhancementLayer.ExtendedVideoSubType = ExtendedVideoSubTypes.DoviProfile76;
-
-                logger.Info($"DolbyVisionProfile - dual-layer DV P7 tagged on enhancement layer ({reason})");
+                Plugin.Instance.Logger.Info($"DolbyVisionProfile - dual-layer DV P7 tagged on enhancement layer ({reason})");
             }
             catch (Exception ex)
             {
                 Plugin.Instance.Logger.Debug("DolbyVisionProfile postfix failed: " + ex.Message);
             }
+        }
+
+        internal static bool TryTagDualLayer(MediaInfo mediaInfo, out string reason)
+        {
+            reason = null;
+            if (mediaInfo?.MediaStreams == null)
+            {
+                reason = "media info is unavailable";
+                return false;
+            }
+
+            var videos = mediaInfo.MediaStreams
+                .Where(stream => stream?.Type == MediaStreamType.Video)
+                .ToList();
+            if (videos.Count == 0)
+            {
+                reason = "no video streams";
+                return false;
+            }
+
+            if (videos.Any(HasDoviEvidence))
+            {
+                reason = "existing Dolby Vision metadata found; leaving it unchanged";
+                return false;
+            }
+
+            var container = mediaInfo.Container?.Trim().ToLowerInvariant();
+            if (container != "mpegts" && container != "ts" && container != "m2ts")
+            {
+                reason = "geometry-only tagging requires an MPEG-TS source";
+                return false;
+            }
+
+            if (videos.Count != 2)
+            {
+                reason = "geometry-only tagging requires exactly two video streams";
+                return false;
+            }
+
+            if (!DvProfileDetector.TryDetectDualLayerProfile7(videos, out var enhancementLayer, out reason))
+                return false;
+
+            enhancementLayer.ExtendedVideoType = ExtendedVideoTypes.DolbyVision;
+            enhancementLayer.ExtendedVideoSubType = ExtendedVideoSubTypes.DoviProfile76;
+            return true;
+        }
+
+        private static bool HasDoviEvidence(MediaStream stream)
+        {
+            if (stream.ExtendedVideoType == ExtendedVideoTypes.DolbyVision) return true;
+            if (stream.ExtendedVideoSubType.ToString().StartsWith("DoviProfile", StringComparison.Ordinal)) return true;
+            return !string.IsNullOrEmpty(stream.VideoRange) &&
+                   stream.VideoRange.IndexOf("dovi", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

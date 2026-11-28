@@ -65,10 +65,7 @@ namespace StrmAssistant.ScheduledTask
             var movies = new List<Movie>();
             if (scrapeOptions.IncludeMovies)
             {
-                movies = _libraryManager.GetItemList(new InternalItemsQuery
-                    {
-                        IncludeItemTypes = new[] { nameof(Movie) }
-                    })
+                movies = _libraryManager.GetItemList(CreateMovieQuery(scrapePaths))
                     .OfType<Movie>()
                     .Where(m => HasAnyProviderId(m) &&
                                 ShouldScrapeMovie(Plugin.ChapterApi.HasNonDbIntro(m), Plugin.ChapterApi.HasCredits(m)))
@@ -125,6 +122,19 @@ namespace StrmAssistant.ScheduledTask
 
             Plugin.IntroDbApi.LogRequestSummary();
             _logger.Info("IntroDbScrape - Scheduled Task Complete: {0} item(s) marked", marked);
+        }
+
+        internal static InternalItemsQuery CreateMovieQuery(IEnumerable<string> scrapePaths)
+        {
+            var query = new InternalItemsQuery
+            {
+                IncludeItemTypes = new[] { nameof(Movie) }
+            };
+            var paths = scrapePaths?
+                .Where(path => !string.IsNullOrWhiteSpace(path))
+                .ToArray();
+            if (paths?.Length > 0) query.PathStartsWithAny = paths;
+            return query;
         }
 
         /// <summary>

@@ -459,7 +459,6 @@ namespace StrmAssistant.Common
         private static TitleInfo ResolveBluray(IDiscFs fs, bool metadataProbe = false)
         {
             PlaylistEntry best = null;
-            var hadParsedPlaylist = false;
 
             var playlistPaths = fs.GetFiles(BlurayPlaylistDir)
                 .Where(path => path.EndsWith(".mpls", StringComparison.OrdinalIgnoreCase))
@@ -492,7 +491,6 @@ namespace StrmAssistant.Common
                 }
 
                 if (entry == null || entry.Clips.Count == 0) continue;
-                hadParsedPlaylist = true;
                 var reason = GetPlaylistRejectionReason(entry);
                 var uniquePaths = entry.Clips.Select(c => BlurayStreamDir + "\\" + c.Name + ".m2ts")
                     .Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -558,7 +556,7 @@ namespace StrmAssistant.Common
                 Log($"selected stream {relative} not found; falling back to largest m2ts");
             }
 
-            if (hadParsedPlaylist)
+            if (playlistPaths.Length > 0)
                 return new TitleInfo { IsBluray = true, UnsupportedReason =
                     "No reliable playable playlist remains after validation; refusing an arbitrary stream fallback." };
             return LargestFile(fs, BlurayStreamDir, ".m2ts", true);

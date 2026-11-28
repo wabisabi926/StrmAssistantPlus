@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using StrmAssistant.Common;
 using Xunit;
@@ -64,6 +65,60 @@ namespace StrmAssistant.Tests
         {
             Assert.True(IsoMounter.TryNormalizeRemoteIso(url, out var normalized));
             Assert.Equal(url, normalized);
+        }
+
+        [Fact]
+        public void AllPlaylistsInvalid_DoesNotFallBackToLargestStream()
+        {
+            var fs = new FakeDiscFs();
+            fs.Files[@"BDMV\PLAYLIST"] = new[] { @"BDMV\PLAYLIST\00000.mpls" };
+            fs.Lengths[@"BDMV\PLAYLIST\00000.mpls"] = 4;
+            fs.Contents[@"BDMV\PLAYLIST\00000.mpls"] = new byte[4];
+            fs.Files[@"BDMV\STREAM"] = new[] { @"BDMV\STREAM\00000.m2ts" };
+            fs.Lengths[@"BDMV\STREAM\00000.m2ts"] = 1024;
+
+            var title = UdfTitleResolver.ResolveFromFileSystem(fs, true);
+
+            Assert.NotNull(title);
+            Assert.Contains("No reliable playable playlist", title.UnsupportedReason);
+            Assert.Null(title.RelativePath);
+            Assert.Empty(title.ProbePaths);
+        }
+
+        [Fact]
+        public void NoPlaylist_StillUsesLargestStreamFallback()
+        {
+            var fs = new FakeDiscFs();
+            fs.Files[@"BDMV\PLAYLIST"] = Array.Empty<string>();
+            fs.Files[@"BDMV\STREAM"] = new[] { @"BDMV\STREAM\00000.m2ts", @"BDMV\STREAM\00001.m2ts" };
+            fs.Lengths[@"BDMV\STREAM\00000.m2ts"] = 1024;
+            fs.Lengths[@"BDMV\STREAM\00001.m2ts"] = 2048;
+
+            var title = UdfTitleResolver.ResolveFromFileSystem(fs, true);
+
+            Assert.NotNull(title);
+            Assert.Null(title.UnsupportedReason);
+            Assert.Equal(@"BDMV\STREAM\00001.m2ts", title.RelativePath);
+        }
+
+        private sealed class FakeDiscFs : UdfTitleResolver.IDiscFs
+        {
+            public Dictionary<string, string[]> Files { get; } = new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, long> Lengths { get; } = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+            public Dictionary<string, byte[]> Contents { get; } = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+
+            public bool DirectoryExists(string relativeDir) =>
+                Files.ContainsKey(relativeDir) || Lengths.Keys.Any(path => path.StartsWith(relativeDir + "\\", StringComparison.OrdinalIgnoreCase));
+
+            public bool FileExists(string relativePath) => Lengths.ContainsKey(relativePath);
+
+            public string[] GetFiles(string relativeDir) =>
+                Files.TryGetValue(relativeDir, out var files) ? files : Array.Empty<string>();
+
+            public long GetFileLength(string relativePath) => Lengths.TryGetValue(relativePath, out var length) ? length : 0;
+
+            public byte[] ReadAllBytes(string relativePath) =>
+                Contents.TryGetValue(relativePath, out var content) ? content : Array.Empty<byte>();
         }
     }
 }
