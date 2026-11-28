@@ -9,6 +9,7 @@ using MediaBrowser.Model.Attributes;
 using MediaBrowser.Model.Entities;
 using MediaBrowser.Model.LocalizationAttributes;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using StrmAssistant.Properties;
 using System;
 using System.Collections.Generic;
@@ -43,7 +44,7 @@ namespace StrmAssistant.Options
         [DisplayNameL("IntroSkipOptions_ParallelMarkerComputation_Parallel_Marker_Computation", typeof(Resources))]
         [DescriptionL("IntroSkipOptions_ParallelMarkerComputation_Bypass_the_master_concurrency_limit_for_fingerprint_extraction_and_parallelize_across_all_CPU_cores__Default_is_OFF_", typeof(Resources))]
         [Required]
-        [VisibleCondition(nameof(UnlockIntroSkip), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(ShowParallelMarkerComputation), SimpleCondition.IsTrue)]
         [EnabledCondition(nameof(IsModSupported), SimpleCondition.IsTrue)]
         public bool ParallelMarkerComputation { get; set; } = false;
 
@@ -76,11 +77,18 @@ namespace StrmAssistant.Options
         [EnabledCondition(nameof(IsModSupported), SimpleCondition.IsTrue)]
         public string FingerprintBlacklistKeywords { get; set; } = string.Empty;
 
-        [VisibleCondition(nameof(UnlockIntroSkip), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(HasFingerprintBlacklistShowsResult), SimpleCondition.IsTrue)]
         public GenericItemList FingerprintBlacklistShowsResult { get; set; } = new GenericItemList();
 
-        [VisibleCondition(nameof(UnlockIntroSkip), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(HasFingerprintBlacklistShowsResult), SimpleCondition.IsTrue)]
         public SpacerItem FingerprintBlacklistShowsResultSeparator { get; set; } = new SpacerItem(SpacerSize.Medium);
+
+        [Browsable(false)]
+        public bool HasFingerprintBlacklistShowsResult => UnlockIntroSkip && FingerprintBlacklistShowsResult.Count > 0;
+
+        [Browsable(false)]
+        public bool ShowParallelMarkerComputation =>
+            UnlockIntroSkip && EmbyVersionAdapter.GetCurrentApiVersion() < EmbyApiVersion.V4_11;
 
         [Browsable(false)]
         public bool IsModSupported =>

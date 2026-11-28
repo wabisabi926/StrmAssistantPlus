@@ -23,8 +23,6 @@ namespace StrmAssistant.Options
         [DisplayNameL("PluginOptions_MetadataEnhanceOptions_Metadata_Enhance", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_MetadataEnhanceOptions_Metadata_Enhance;
 
-        public override string EditorDescription => Resources.MetadataEnhanceOptions_EditorDescription_Metadata_Enhance;
-
         /// <summary>中文元数据：MovieDb / Tvdb 中文回退语言、非回退语言屏蔽等。</summary>
         [DisplayNameL("MetadataEnhanceOptions_Group_ChineseMetadata", typeof(Resources))]
         public ChineseMetadataOptions ChineseMetadata { get; set; } = new ChineseMetadataOptions();

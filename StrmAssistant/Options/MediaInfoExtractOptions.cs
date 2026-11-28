@@ -103,15 +103,18 @@ namespace StrmAssistant.Options
                         "ExtractionScope", "ExtractionScope"),
                     new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_AutoOnDemand,
                         "AutoOnDemand", "AutoCatchup", "OnDemand"),
-                    new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_ExtractionPerformance,
-                        "ExtractionPerformance", "ExtractionPerformance"),
-                    new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_StorageCapture,
-                        "StorageCapture", "MediaInfoPersist", "ImageCapture"),
+                    new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_MediaInfoPersist,
+                        "MediaInfoPersist", "MediaInfoPersist"),
+                    new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_ImageCapture,
+                        "ImageCapture", "ImageCapture"),
                     new EditorGroupSpec(Resources.MediaInfoExtractOptions_Group_IsoHdr,
-                        "IsoHdr", "HdrTagging", "IsoTool"));
+                        "IsoHdr", "HdrTagging", "IsoTool"),
+                    new EditorGroupSpec(Resources.Options_Group_Advanced + " · " +
+                                        Resources.MediaInfoExtractOptions_Group_ExtractionPerformance,
+                        "ExtractionPerformance", "ExtractionPerformance"));
 
-                // 存储与截图在前，破坏性的清除内嵌元数据放到组尾。
-                EditorGroupHelper.MoveItemsToEnd(editContainer, "StorageCapture",
+                // 破坏性的清除内嵌元数据放到持久化组尾。
+                EditorGroupHelper.MoveItemsToEnd(editContainer, "MediaInfoPersist",
                     nameof(MediaInfoPersistOptions.ClearEmbeddedMetadata));
 
                 LocalizationHelper.ApplyDescriptions(editContainer, this);

@@ -2,8 +2,6 @@ using Emby.Web.GenericEdit;
 using Emby.Web.GenericEdit.Editors;
 using StrmAssistant.Options;
 using StrmAssistant.Properties;
-using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using Xunit;
 using Xunit.Abstractions;
@@ -34,19 +32,15 @@ namespace StrmAssistant.Tests
             var concurrencyIndex = items.FindIndex(i => NameOrId(i, "TaskConcurrency"));
             var memoryIndex = items.FindIndex(i => NameOrId(i, "Memory"));
             var tasksIndex = items.FindIndex(i => NameOrId(i, "ScheduledTasks"));
+            var diagnosticsIndex = items.FindIndex(i => NameOrId(i, "DiagnosticsMaintenance"));
             var tasks = items.OfType<EditorGroup>().FirstOrDefault(g => NameOrId(g, "ScheduledTasks"));
             Assert.NotNull(tasks);
             Assert.Equal(Resources.ScheduledTasks_EditorTitle_Common_Tasks, tasks.DisplayName);
-            var runtimeIndex = items.FindIndex(i => NameOrId(i, "RuntimeStatus"));
-            var configIndex = items.FindIndex(i => NameOrId(i, "ConfigTransfer"));
-            var aboutIndex = items.FindIndex(i => NameOrId(i, "AboutOptions"));
-            Assert.True(chineseIndex > enableIndex);
-            Assert.True(concurrencyIndex > chineseIndex);
-            Assert.True(memoryIndex > concurrencyIndex);
+            Assert.True(concurrencyIndex > enableIndex);
+            Assert.True(chineseIndex > concurrencyIndex);
+            Assert.True(memoryIndex > chineseIndex);
             Assert.True(tasksIndex > memoryIndex);
-            Assert.True(runtimeIndex > tasksIndex);
-            Assert.True(configIndex > runtimeIndex);
-            Assert.True(aboutIndex > configIndex);
+            Assert.True(diagnosticsIndex > tasksIndex);
 
             var concurrency = items.OfType<EditorGroup>()
                 .FirstOrDefault(g => NameOrId(g, "TaskConcurrency"));
@@ -54,13 +48,26 @@ namespace StrmAssistant.Tests
             Assert.Contains(concurrency.EditorItems, i => NameOrId(i, "MaxConcurrentCount"));
             Assert.DoesNotContain(concurrency.EditorItems, i => NameOrId(i, "CatchupMode"));
 
-            var configTransfer = items.OfType<EditorGroup>()
-                .FirstOrDefault(g => NameOrId(g, "ConfigTransfer"));
-            Assert.NotNull(configTransfer);
-            Assert.Contains(configTransfer.EditorItems, i => NameOrId(i, "ConfigTransferFolder"));
-            var configButtons = configTransfer.EditorItems.OfType<EditorButtonGroup>().FirstOrDefault();
-            Assert.NotNull(configButtons);
-            Assert.Equal(2, configButtons.EditorItems.Count());
+            var memory = items.OfType<EditorGroup>()
+                .First(g => NameOrId(g, "Memory"));
+            Assert.Equal(
+                new[] { "Memory.EnableMemoryCleanup", "Memory.MemoryCleanupIntervalMinutes",
+                        "Memory.EnableMemoryAutoRestart", "Memory.MemoryAutoRestartThresholdMB" },
+                memory.EditorItems.Select(item => item.Id).ToArray());
+            Assert.DoesNotContain(items.OfType<EditorGroup>(), g => NameOrId(g, "AdvancedMemory"));
+
+            var diagnostics = items.OfType<EditorGroup>()
+                .FirstOrDefault(g => NameOrId(g, "DiagnosticsMaintenance"));
+            Assert.NotNull(diagnostics);
+            Assert.Contains(diagnostics.EditorItems, i => NameOrId(i, "ConfigTransferFolder"));
+            Assert.Contains(diagnostics.EditorItems, i => NameOrId(i, "CheckUpdateButton"));
+            Assert.Contains(diagnostics.EditorItems.OfType<EditorButtonGroup>()
+                .SelectMany(group => group.EditorItems),
+                button => NameOrId(button, "RestartServerButton"));
+            var configButtons = diagnostics.EditorItems.OfType<EditorButtonGroup>()
+                .First(group => group.EditorItems.Any(button => NameOrId(button, "ExportConfigButton")));
+            Assert.Contains(configButtons.EditorItems, button => NameOrId(button, "ExportConfigButton"));
+            Assert.Contains(configButtons.EditorItems, button => NameOrId(button, "ImportConfigButton"));
         }
 
         [Fact]
@@ -86,30 +93,31 @@ namespace StrmAssistant.Tests
 
             var groups = container.EditorRoot.EditorItems.OfType<EditorGroup>().ToList();
 
-            // 顺序：提取范围 → 提取策略 → 提取优化 → 存储与截图 → ISO 与 HDR
+            // 顺序：提取范围 → 提取时机 → 持久化 → 图像 → ISO/HDR → 高级性能
             Assert.Equal(
-                new[] { "ExtractionScope", "AutoOnDemand", "ExtractionPerformance",
-                        "StorageCapture", "IsoHdr" },
+                new[] { "ExtractionScope", "AutoOnDemand", "MediaInfoPersist",
+                        "ImageCapture", "IsoHdr", "ExtractionPerformance" },
                 groups.Select(g => g.Name).ToArray());
 
             // 不再有运行时合并组
             Assert.DoesNotContain(groups, g => NameOrId(g, "MediaInfoStoragePerformance"));
+            Assert.DoesNotContain(groups, g => NameOrId(g, "StorageCapture"));
 
-            // 独占提取排在性能组最前（独立控制项紧随其后）
+            // 独占提取排在高级性能组最前（独立控制项紧随其后）
             var perf = groups.First(g => NameOrId(g, "ExtractionPerformance"));
+            Assert.StartsWith(Resources.Options_Group_Advanced, perf.DisplayName);
             Assert.True(NameOrId(perf.EditorItems.First(), "ExclusiveExtract"));
             Assert.Contains(perf.EditorItems, i => NameOrId(i, "MediaInfoExtractionTimeoutMs"));
             Assert.Contains(perf.EditorItems, i => NameOrId(i, "ImageExtractionTimeoutMultiplier"));
 
-            // 存储与截图只放持久化/截图相关项，不再混入独占/超时
-            var storage = groups.First(g => NameOrId(g, "StorageCapture"));
-            Assert.Contains(storage.EditorItems, i => NameOrId(i, "PersistMediaInfoMode"));
-            Assert.Contains(storage.EditorItems, i => NameOrId(i, "EnableImageCapture"));
-            Assert.DoesNotContain(storage.EditorItems, i => NameOrId(i, "ExclusiveExtract"));
-            Assert.DoesNotContain(storage.EditorItems, i => NameOrId(i, "MediaInfoExtractionTimeoutMs"));
-            Assert.True(NameOrId(storage.EditorItems.Last(), "ClearEmbeddedMetadata"));
-            Assert.DoesNotContain(storage.EditorItems.Take(storage.EditorItems.Length - 1),
-                i => NameOrId(i, "ClearEmbeddedMetadata"));
+            var persist = groups.First(g => NameOrId(g, "MediaInfoPersist"));
+            Assert.Contains(persist.EditorItems, i => i.Id == "MediaInfoPersist.PersistMediaInfoMode");
+            Assert.Equal("MediaInfoPersist.ClearEmbeddedMetadata", persist.EditorItems.Last().Id);
+            Assert.DoesNotContain(persist.EditorItems, i => NameOrId(i, "EnableImageCapture"));
+
+            var capture = groups.First(g => NameOrId(g, "ImageCapture"));
+            Assert.Contains(capture.EditorItems, i => NameOrId(i, "EnableImageCapture"));
+            Assert.DoesNotContain(capture.EditorItems, i => NameOrId(i, "PersistMediaInfoMode"));
         }
 
         [Fact]
@@ -187,7 +195,9 @@ namespace StrmAssistant.Tests
             Assert.Equal(new[] { "Playback", "Fingerprint", "Scrape" },
                 groups.Select(g => g.Name).ToArray());
 
-            var fingerprint = groups.First(g => NameOrId(g, "Fingerprint")).EditorItems.ToList();
+            var fingerprintGroup = groups.First(g => NameOrId(g, "Fingerprint"));
+            Assert.Equal(Resources.IntroSkipOptions_Group_Fingerprint, fingerprintGroup.DisplayName);
+            var fingerprint = fingerprintGroup.EditorItems.ToList();
             Assert.True(fingerprint.FindIndex(i => NameOrId(i, "ParallelMarkerComputation")) <
                         fingerprint.FindIndex(i => NameOrId(i, "MarkerEnabledLibraryScope")));
             Assert.True(fingerprint.FindIndex(i => NameOrId(i, "MarkerEnabledLibraryScope")) <
@@ -228,8 +238,8 @@ namespace StrmAssistant.Tests
             Assert.Contains(playbackItems, i => NameOrId(i, "EnableDeepDelete"));
             Assert.True(playbackItems.FindIndex(i => NameOrId(i, "DryRun")) >
                         playbackItems.FindIndex(i => NameOrId(i, "EnableDeepDelete")));
-            Assert.True(playbackItems.FindIndex(i => NameOrId(i, "EnableDeepDelete")) >
-                        playbackItems.FindIndex(i => NameOrId(i, "LibraryScopePlayProgress")));
+            Assert.Contains(playbackItems, i => i.Id == "Playback.LibraryScopePlayProgress");
+            Assert.DoesNotContain(groups, g => NameOrId(g, "AdvancedPlayback"));
             Assert.DoesNotContain(groups, g => NameOrId(g, "Safety"));
 
             var versions = groups.First(g => NameOrId(g, "MultipleVersions")).EditorItems.ToList();
@@ -240,6 +250,7 @@ namespace StrmAssistant.Tests
 
             var itemDisplay = groups.First(g => NameOrId(g, "ItemDisplay"));
             var notifications = groups.First(g => NameOrId(g, "NotificationsLogs"));
+            Assert.Equal(Resources.ExperienceEnhanceOptions_Group_NotificationAndLogs, notifications.DisplayName);
             Assert.Contains(itemDisplay.EditorItems, i => NameOrId(i, "ShowMediaInfo"));
             Assert.Contains(itemDisplay.EditorItems, i => NameOrId(i, "BlockSearchRecommend"));
             Assert.DoesNotContain(notifications.EditorItems, i => NameOrId(i, "ShowMediaInfo"));
@@ -248,21 +259,24 @@ namespace StrmAssistant.Tests
         }
 
         [Fact]
-        public void RuntimeStatus_ContainsHealthActionButtons()
+        public void DiagnosticsMaintenance_ContainsHealthAndConfigActions()
         {
-            // 片源体检摘要已并入根级「运行概览」，维护工具组只保留操作按钮。
             var container = (EditObjectContainer)new PluginOptions().CreateEditContainer();
-            var runtime = container.EditorRoot.EditorItems.OfType<EditorGroup>()
-                .FirstOrDefault(g => NameOrId(g, "RuntimeStatus"));
+            var diagnostics = container.EditorRoot.EditorItems.OfType<EditorGroup>()
+                .FirstOrDefault(g => NameOrId(g, "DiagnosticsMaintenance"));
 
-            Assert.NotNull(runtime);
-            Assert.Empty(runtime.EditorItems.OfType<EditorStatusItem>());
+            Assert.NotNull(diagnostics);
+            Assert.DoesNotContain(diagnostics.EditorItems.OfType<EditorStatusItem>(),
+                item => NameOrId(item, "OverviewStatus"));
 
-            // 连续的 ButtonItem 会被合并进同一个 EditorButtonGroup：
-            // 校验元数据缓存 + 立即体检 + 导出体检报告 + 清内存 + 重建索引 + 清缓存 + 优化索引 + 重启
-            var buttonGroup = runtime.EditorItems.OfType<EditorButtonGroup>().FirstOrDefault();
-            Assert.NotNull(buttonGroup);
-            Assert.Equal(8, buttonGroup.EditorItems.Count());
+            var buttons = diagnostics.EditorItems.OfType<EditorButtonItem>()
+                .Concat(diagnostics.EditorItems.OfType<EditorButtonGroup>()
+                    .SelectMany(group => group.EditorItems))
+                .ToList();
+            Assert.Contains(buttons, item => NameOrId(item, "MediaHealthCheckButton"));
+            Assert.Contains(buttons, item => NameOrId(item, "ExportConfigButton"));
+            Assert.Contains(buttons, item => NameOrId(item, "CheckUpdateButton"));
+            Assert.Equal("RuntimeStatus.RestartServerButton", buttons.Last().Id);
         }
 
         [Fact]
@@ -278,36 +292,33 @@ namespace StrmAssistant.Tests
                         "RebuildUserDataKeysButton" },
                 taskButtons.Select(b => b.Name).ToArray());
 
-            var maintenance = groups.First(g => NameOrId(g, "RuntimeStatus"));
-            var maintenanceButtons = maintenance.EditorItems.OfType<EditorButtonGroup>().Single()
+            var maintenance = groups.First(g => NameOrId(g, "DiagnosticsMaintenance"));
+            var maintenanceButtons = maintenance.EditorItems.OfType<EditorButtonGroup>().First()
                 .EditorItems.ToList();
             Assert.Equal(
                 new[] { "VerifyMetadataCacheButton", "MediaHealthCheckButton", "ExportMediaHealthButton",
                         "CleanMemoryNowButton", "ScheduleIndexRebuildButton", "OptimizeSearchIndexButton",
-                        "ClearMetadataCacheButton", "RestartServerButton" },
+                        "ClearMetadataCacheButton" },
                 maintenanceButtons.Select(b => b.Name).ToArray());
+            Assert.Equal("RestartServerButton", maintenance.EditorItems.OfType<EditorButtonGroup>()
+                .SelectMany(group => group.EditorItems)
+                .Last().Name);
         }
 
         [Fact]
-        public void PageDescriptions_OnlyApprovedPagesAreLocalized()
+        public void PageDescriptions_AreUniformlyEmpty()
         {
-            var descriptions = new Dictionary<EditableOptionsBase, string>
+            var pages = new EditableOptionsBase[]
             {
-                [new PluginOptions()] = "PluginOptions_EditorDescription_Basic_Settings",
-                [new MetadataEnhanceOptions()] = "MetadataEnhanceOptions_EditorDescription_Metadata_Enhance",
-                [new IntroSkipOptions()] = "IntroSkipOptions_EditorDescription_Intro_Credits_Detection",
-                [new NetworkProxyOptions()] = "NetworkProxyOptions_EditorDescription_Network_Direct_Link"
+                new PluginOptions(),
+                new ExperienceEnhanceOptions(),
+                new MediaInfoExtractOptions(),
+                new MetadataEnhanceOptions(),
+                new IntroSkipOptions(),
+                new NetworkProxyOptions()
             };
 
-            foreach (var pair in descriptions)
-            {
-                var expected = Resources.ResourceManager.GetString(pair.Value, CultureInfo.CurrentUICulture);
-                Assert.False(string.IsNullOrWhiteSpace(expected), $"{pair.Value} is missing");
-                Assert.Equal(expected, pair.Key.EditorDescription);
-            }
-
-            Assert.True(string.IsNullOrEmpty(new ExperienceEnhanceOptions().EditorDescription));
-            Assert.True(string.IsNullOrEmpty(new MediaInfoExtractOptions().EditorDescription));
+            Assert.All(pages, page => Assert.True(string.IsNullOrEmpty(page.EditorDescription)));
         }
 
         private static bool NameOrId(EditorBase editor, string name)

@@ -15,17 +15,6 @@ namespace StrmAssistant.Options
         [DisplayNameL("GeneralOptions_Group_Memory", typeof(Resources))]
         public override string EditorTitle => Resources.GeneralOptions_Group_Memory;
 
-        [DisplayNameL("PluginOptions_EnableMemoryAutoRestart_Auto_Restart_On_Memory_Limit", typeof(Resources))]
-        [DescriptionL("PluginOptions_EnableMemoryAutoRestart_Automatically_restart_the_server_after_working_set_exceeds_the_limit_sustained__Admins_get_a_countdown_notification__Default_is_OFF_", typeof(Resources))]
-        [Required]
-        public bool EnableMemoryAutoRestart { get; set; } = false;
-
-        [DisplayNameL("PluginOptions_MemoryAutoRestartThresholdMB_Memory_Limit", typeof(Resources))]
-        [DescriptionL("PluginOptions_MemoryAutoRestartThresholdMB_Working_set_limit_in_MB_before_restart_countdown_starts__Default_is_4096_", typeof(Resources))]
-        [Required, MinValue(512), MaxValue(65536)]
-        [VisibleCondition(nameof(EnableMemoryAutoRestart), SimpleCondition.IsTrue)]
-        public int MemoryAutoRestartThresholdMB { get; set; } = 4096;
-
         [DisplayNameL("GeneralOptions_EnableMemoryCleanup_Title", typeof(Resources))]
         [DescriptionL("GeneralOptions_EnableMemoryCleanup_Description", typeof(Resources))]
         [Required]
@@ -36,5 +25,16 @@ namespace StrmAssistant.Options
         [VisibleCondition(nameof(EnableMemoryCleanup), SimpleCondition.IsTrue)]
         [Required, MinValue(1), MaxValue(120)]
         public int MemoryCleanupIntervalMinutes { get; set; } = 5;
+
+        [DisplayNameL("PluginOptions_EnableMemoryAutoRestart_Auto_Restart_On_Memory_Limit", typeof(Resources))]
+        [DescriptionL("PluginOptions_EnableMemoryAutoRestart_Automatically_restart_the_server_after_working_set_exceeds_the_limit_sustained__Admins_get_a_countdown_notification__Default_is_OFF_", typeof(Resources))]
+        [Required]
+        public bool EnableMemoryAutoRestart { get; set; } = false;
+
+        [DisplayNameL("PluginOptions_MemoryAutoRestartThresholdMB_Memory_Limit", typeof(Resources))]
+        [DescriptionL("PluginOptions_MemoryAutoRestartThresholdMB_Working_set_limit_in_MB_before_restart_countdown_starts__Default_is_4096_", typeof(Resources))]
+        [Required, MinValue(512), MaxValue(65536)]
+        [VisibleCondition(nameof(EnableMemoryAutoRestart), SimpleCondition.IsTrue)]
+        public int MemoryAutoRestartThresholdMB { get; set; } = 4096;
     }
 }

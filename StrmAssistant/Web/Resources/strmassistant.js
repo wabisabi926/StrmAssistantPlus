@@ -178,6 +178,18 @@ define([
             keyword = '';
         }
 
+        function removeEmptySubCaptions() {
+            const parents = document.querySelectorAll('.mainContentParent');
+            for (const parent of parents) {
+                for (const section of parent.children) {
+                    if (!section.classList.contains('verticalSection')) continue;
+                    if ((section.textContent || '').trim()) continue;
+                    if (section.querySelector('button,input,select,textarea,[contenteditable="true"]')) continue;
+                    section.remove();
+                }
+            }
+        }
+
         function ensureBox() {
             if (box && document.body.contains(box)) return box;
             if (!optionContainers().length) return null;
@@ -227,6 +239,7 @@ define([
                     return;
                 }
 
+                removeEmptySubCaptions();
                 ensureBox();
 
                 // Emby 的 GenericUI 会整块重渲染选项，过滤状态会被重置 → 每次扫描重新应用

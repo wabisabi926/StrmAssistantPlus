@@ -4,6 +4,7 @@ using MediaBrowser.Model.IO;
 using MediaBrowser.Model.Logging;
 using MediaBrowser.Model.Tasks;
 using StrmAssistant.Common;
+using StrmAssistant.Core;
 using StrmAssistant.Properties;
 using System;
 using System.Collections.Concurrent;
@@ -356,6 +357,8 @@ namespace StrmAssistant.ScheduledTask
         {
             return Array.Empty<TaskTriggerInfo>();
         }
+
+        public bool IsHidden => EmbyVersionAdapter.GetCurrentApiVersion() >= EmbyApiVersion.V4_11;
 
         public static bool IsRunning { get; private set; }
     }

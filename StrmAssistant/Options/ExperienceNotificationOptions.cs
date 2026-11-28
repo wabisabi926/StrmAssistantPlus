@@ -1,6 +1,7 @@
 using Emby.Web.GenericEdit;
 using MediaBrowser.Model.Attributes;
 using MediaBrowser.Model.LocalizationAttributes;
+using StrmAssistant.Core;
 using StrmAssistant.Properties;
 using System.ComponentModel;
 using System.Runtime.InteropServices;
@@ -21,12 +22,21 @@ namespace StrmAssistant.Options
         [DescriptionL("ExperienceEnhanceOptions_EnhanceNotification_Show_episode_details_in_series_notification__Default_is_OFF_", typeof(Resources))]
         [Required]
         [EnabledCondition(nameof(IsModSupported), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(IsNotificationSummarySupported), SimpleCondition.IsTrue)]
         public bool EnhanceNotificationSystem { get; set; } = false;
 
         [DisplayNameL("ExperienceEnhanceOptions_MetadataUpdateTrackedFields_Metadata_Update_Tracked_Fields", typeof(Resources))]
         [DescriptionL("ExperienceEnhanceOptions_MetadataUpdateTrackedFields_Comma_separated_metadata_fields_that_trigger_the_metadata_update_notification__blank_notifies_all__Default_is_EMPTY_", typeof(Resources))]
-        [VisibleCondition(nameof(EnhanceNotificationSystem), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(ShowMetadataUpdateTrackedFields), SimpleCondition.IsTrue)]
         public string MetadataUpdateTrackedFields { get; set; } = string.Empty;
+
+        [Browsable(false)]
+        public bool ShowMetadataUpdateTrackedFields =>
+            EnhanceNotificationSystem && IsNotificationSummarySupported;
+
+        [Browsable(false)]
+        public bool IsNotificationSummarySupported =>
+            EmbyVersionAdapter.Instance.ApiVersion < EmbyApiVersion.V4_11;
 
         [Browsable(false)]
         public bool IsModSupported =>

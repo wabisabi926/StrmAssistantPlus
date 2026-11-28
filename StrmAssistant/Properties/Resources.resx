@@ -158,9 +158,6 @@
   <data name="PluginOptions_IntroSkipOptions_Intro_Credits_Detection" xml:space="preserve">
     <value>Intro &amp; Credits</value>
   </data>
-  <data name="IntroSkipOptions_EditorDescription_Intro_Credits_Detection" xml:space="preserve">
-    <value>Playback detection, fingerprints, and online markers.</value>
-  </data>
   <data name="IntroSkipOptions_LibraryScope_Library_Scope" xml:space="preserve">
     <value>Playback Detection Libraries</value>
   </data>
@@ -364,9 +361,6 @@
   </data>
   <data name="PluginOptions_MetadataEnhanceOptions_Metadata_Enhance" xml:space="preserve">
     <value>Metadata</value>
-  </data>
-  <data name="MetadataEnhanceOptions_EditorDescription_Metadata_Enhance" xml:space="preserve">
-    <value>Scraping, ratings, people, episodes, and cache.</value>
   </data>
   <data name="MetadataEnhanceOptions_EnhanceNfoMetadata_Nfo_Metadata_Import_Enhanced" xml:space="preserve">
     <value>Nfo Metadata Import Enhanced</value>
@@ -1641,10 +1635,19 @@
     <value>Extract the next episode's media info in the background during playback. Default is OFF.</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>Control &amp; Performance</value>
+    <value>Extraction Control &amp; Performance</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>Fingerprint Detection</value>
+  </data>
+  <data name="IntroSkipOptions_Group_IntroCreditsDetection" xml:space="preserve">
+    <value>Intro &amp; Credits Detection</value>
+  </data>
+  <data name="IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Enhanced" xml:space="preserve">
+    <value>Enable Native Intro &amp; Credits Detection</value>
+  </data>
+  <data name="IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Description" xml:space="preserve">
+    <value>Adds scope controls and STRM support for native intro and credits detection. Credits detection must also be enabled in the library settings. Default is OFF.</value>
   </data>
   <data name="IntroSkipOptions_Group_Scrape" xml:space="preserve">
     <value>Online Scraping</value>
@@ -1685,14 +1688,17 @@
   <data name="GeneralOptions_Group_RuntimeStatus" xml:space="preserve">
     <value>Maintenance</value>
   </data>
+  <data name="Options_Group_Advanced" xml:space="preserve">
+    <value>Advanced</value>
+  </data>
+  <data name="Options_Group_DiagnosticsMaintenance" xml:space="preserve">
+    <value>Diagnostics and Maintenance</value>
+  </data>
   <data name="ModOptions_Group_ChineseSearch" xml:space="preserve">
     <value>Chinese Search</value>
   </data>
   <data name="PluginOptions_EditorTitle_Basic_Settings" xml:space="preserve">
     <value>Basic Settings</value>
-  </data>
-  <data name="PluginOptions_EditorDescription_Basic_Settings" xml:space="preserve">
-    <value>Plugin status, tasks, and maintenance.</value>
   </data>
   <data name="PluginOptions_EnablePlugin_Enable_Plugin" xml:space="preserve">
     <value>Enable Plugin</value>
@@ -1702,9 +1708,6 @@
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
     <value>Network &amp; API</value>
-  </data>
-  <data name="NetworkProxyOptions_EditorDescription_Network_Direct_Link" xml:space="preserve">
-    <value>Proxy, direct links, and TMDB API.</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>Clear Season Map</value>
@@ -1930,6 +1933,9 @@
   </data>
   <data name="ExperienceEnhanceOptions_Group_NotificationAndLogs" xml:space="preserve">
     <value>Notifications &amp; Logs</value>
+  </data>
+  <data name="ExperienceEnhanceOptions_Group_Logs" xml:space="preserve">
+    <value>Logs</value>
   </data>
   <data name="IntroSkipOptions_MaxIntroDurationSeconds_Description" xml:space="preserve">
     <value>Range 10–600, default 150.</value>

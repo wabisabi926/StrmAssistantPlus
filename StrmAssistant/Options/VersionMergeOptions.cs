@@ -69,11 +69,14 @@ namespace StrmAssistant.Options
                 ConfirmationPrompt = Resources.ExperienceEnhanceOptions_SplitMovieButton_Confirmation
             };
 
-        [VisibleCondition(nameof(MergeMultiVersion), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(HasSplitMoviesProgress), SimpleCondition.IsTrue)]
         public GenericItemList SplitMoviesProgress { get; set; } = new GenericItemList();
 
-        [VisibleCondition(nameof(MergeMultiVersion), SimpleCondition.IsTrue)]
+        [VisibleCondition(nameof(HasSplitMoviesProgress), SimpleCondition.IsTrue)]
         public SpacerItem SplitMovieProgressSeparator { get; set; } = new SpacerItem(SpacerSize.Small);
+
+        [Browsable(false)]
+        public bool HasSplitMoviesProgress => MergeMultiVersion && SplitMoviesProgress.Count > 0;
 
         [Browsable(false)]
         public bool IsModSupported =>

@@ -1,9 +1,12 @@
 ﻿using Emby.Web.GenericEdit;
+using Emby.Web.GenericEdit.Editors;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Model.GenericEdit;
 using MediaBrowser.Model.LocalizationAttributes;
+using StrmAssistant.Core;
 using StrmAssistant.Properties;
 using System.ComponentModel;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace StrmAssistant.Options
@@ -18,8 +21,6 @@ namespace StrmAssistant.Options
     {
         [DisplayNameL("PluginOptions_IntroSkipOptions_Intro_Credits_Detection", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_IntroSkipOptions_Intro_Credits_Detection;
-
-        public override string EditorDescription => Resources.IntroSkipOptions_EditorDescription_Intro_Credits_Detection;
 
         /// <summary>声纹探测：解锁内置检测、指纹时长、并行计算、生效库范围与黑名单。</summary>
         [DisplayNameL("IntroSkipOptions_Group_Fingerprint", typeof(Resources))]
@@ -45,15 +46,34 @@ namespace StrmAssistant.Options
             var container = base.CreateEditContainer();
             if (container is EditObjectContainer editContainer)
             {
+                var isEmby411 = EmbyVersionAdapter.GetCurrentApiVersion() >= EmbyApiVersion.V4_11;
                 EditorGroupHelper.Rebuild(editContainer,
                     new EditorGroupSpec(Resources.IntroSkipOptions_Group_Playback,
                         "Playback", "Playback"),
-                    new EditorGroupSpec(Resources.IntroSkipOptions_Group_Fingerprint,
+                    new EditorGroupSpec(isEmby411
+                        ? Resources.IntroSkipOptions_Group_IntroCreditsDetection
+                        : Resources.IntroSkipOptions_Group_Fingerprint,
                         "Fingerprint", "Fingerprint"),
                     new EditorGroupSpec(Resources.IntroSkipOptions_Group_Scrape,
                         "Scrape", "Scrape"));
 
                 LocalizationHelper.ApplyDescriptions(editContainer, this);
+
+                if (isEmby411)
+                {
+                    var fingerprintGroup = editContainer.EditorRoot.EditorItems.OfType<EditorGroup>()
+                        .FirstOrDefault(group => group.Name == "Fingerprint");
+                    if (fingerprintGroup?.EditorItems != null)
+                    {
+                        var unlockIntroSkip = fingerprintGroup.EditorItems
+                            .FirstOrDefault(item => item.Name == nameof(IntroSkipFingerprintOptions.UnlockIntroSkip));
+                        if (unlockIntroSkip != null)
+                        {
+                            unlockIntroSkip.DisplayName = Resources.IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Enhanced;
+                            unlockIntroSkip.Description = Resources.IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Description;
+                        }
+                    }
+                }
             }
 
             return container;

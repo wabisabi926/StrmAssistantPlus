@@ -71,9 +71,6 @@
   <data name="PluginOptions_IntroSkipOptions_Intro_Credits_Detection" xml:space="preserve">
     <value>片頭片尾</value>
   </data>
-  <data name="IntroSkipOptions_EditorDescription_Intro_Credits_Detection" xml:space="preserve">
-    <value>播放偵測、指紋與線上標記。</value>
-  </data>
   <data name="IntroSkipOptions_LibraryScope_Library_Scope" xml:space="preserve">
     <value>播放偵測媒體庫</value>
   </data>
@@ -277,9 +274,6 @@
   </data>
   <data name="PluginOptions_MetadataEnhanceOptions_Metadata_Enhance" xml:space="preserve">
     <value>元資料</value>
-  </data>
-  <data name="MetadataEnhanceOptions_EditorDescription_Metadata_Enhance" xml:space="preserve">
-    <value>刮削、評分、人物、劇集與快取。</value>
   </data>
   <data name="MetadataEnhanceOptions_EnhanceNfoMetadata_Nfo_Metadata_Import_Enhanced" xml:space="preserve">
     <value>NFO 元資料導入增強</value>
@@ -1554,10 +1548,19 @@
     <value>播放時背景擷取下一集媒體資訊。預設關閉。</value>
   </data>
   <data name="MediaInfoExtractOptions_Group_ExtractionPerformance" xml:space="preserve">
-    <value>控制與效能</value>
+    <value>提取控制與效能</value>
   </data>
   <data name="IntroSkipOptions_Group_Fingerprint" xml:space="preserve">
     <value>片頭指紋偵測</value>
+  </data>
+  <data name="IntroSkipOptions_Group_IntroCreditsDetection" xml:space="preserve">
+    <value>片頭與片尾偵測</value>
+  </data>
+  <data name="IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Enhanced" xml:space="preserve">
+    <value>啟用原生片頭/片尾偵測</value>
+  </data>
+  <data name="IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Description" xml:space="preserve">
+    <value>為原生片頭/片尾偵測提供範圍控制並支援 STRM；片尾還需在媒體庫設定中開啟。預設關閉。</value>
   </data>
   <data name="IntroSkipOptions_Group_Scrape" xml:space="preserve">
     <value>線上刮削</value>
@@ -1598,14 +1601,17 @@
   <data name="GeneralOptions_Group_RuntimeStatus" xml:space="preserve">
     <value>維護工具</value>
   </data>
+  <data name="Options_Group_Advanced" xml:space="preserve">
+    <value>進階</value>
+  </data>
+  <data name="Options_Group_DiagnosticsMaintenance" xml:space="preserve">
+    <value>診斷與維護</value>
+  </data>
   <data name="ModOptions_Group_ChineseSearch" xml:space="preserve">
     <value>中文搜尋</value>
   </data>
   <data name="PluginOptions_EditorTitle_Basic_Settings" xml:space="preserve">
     <value>基礎設定</value>
-  </data>
-  <data name="PluginOptions_EditorDescription_Basic_Settings" xml:space="preserve">
-    <value>外掛啟停、任務與維護。</value>
   </data>
   <data name="PluginOptions_EnablePlugin_Enable_Plugin" xml:space="preserve">
     <value>啟用外掛</value>
@@ -1615,9 +1621,6 @@
   </data>
   <data name="NetworkProxyOptions_EditorTitle_Network_Direct_Link" xml:space="preserve">
     <value>網路與介面</value>
-  </data>
-  <data name="NetworkProxyOptions_EditorDescription_Network_Direct_Link" xml:space="preserve">
-    <value>代理、直連與 TMDB 介面。</value>
   </data>
   <data name="MetadataEnhanceOptions_ClearSeasonMapButton_Clear_Season_Map" xml:space="preserve">
     <value>清除季對應</value>
@@ -1776,7 +1779,7 @@
     <value>合併多版本</value>
   </data>
   <data name="ScheduledTasks_Button_Refresh_Episodes" xml:space="preserve">
-    <value>刷新劇集中繼資料</value>
+    <value>重新整理單集元資料</value>
   </data>
   <data name="Overview_Status_Caption" xml:space="preserve">
     <value>執行概覽</value>
@@ -1843,6 +1846,9 @@
   </data>
   <data name="ExperienceEnhanceOptions_Group_NotificationAndLogs" xml:space="preserve">
     <value>通知與日誌</value>
+  </data>
+  <data name="ExperienceEnhanceOptions_Group_Logs" xml:space="preserve">
+    <value>日誌</value>
   </data>
   <data name="IntroSkipOptions_MaxIntroDurationSeconds_Description" xml:space="preserve">
     <value>範圍 10–600，預設 150。</value>

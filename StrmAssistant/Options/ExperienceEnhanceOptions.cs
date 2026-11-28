@@ -2,6 +2,7 @@ using Emby.Web.GenericEdit;
 using Emby.Web.GenericEdit.Editors;
 using MediaBrowser.Model.GenericEdit;
 using MediaBrowser.Model.LocalizationAttributes;
+using StrmAssistant.Core;
 using StrmAssistant.Properties;
 using System;
 using System.Collections.Generic;
@@ -78,7 +79,9 @@ namespace StrmAssistant.Options
                         "ItemDisplay", "ItemDisplay"),
                     new EditorGroupSpec(Resources.LibraryOrderOptions_EditorTitle_Library_and_Order,
                         "LibraryOrder", "LibraryOrder"),
-                    new EditorGroupSpec(Resources.ExperienceEnhanceOptions_Group_NotificationAndLogs,
+                    new EditorGroupSpec(EmbyVersionAdapter.GetCurrentApiVersion() >= EmbyApiVersion.V4_11
+                        ? Resources.ExperienceEnhanceOptions_Group_Logs
+                        : Resources.ExperienceEnhanceOptions_Group_NotificationAndLogs,
                         "NotificationsLogs", "Notification", "SearchLog"));
 
                 // 搜索结果卡片信息与搜索页推荐属于显示效果，移入显示优化分组。

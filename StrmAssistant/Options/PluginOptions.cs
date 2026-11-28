@@ -19,8 +19,6 @@ namespace StrmAssistant.Options
         [DisplayNameL("PluginOptions_EditorTitle_Basic_Settings", typeof(Resources))]
         public override string EditorTitle => Resources.PluginOptions_EditorTitle_Basic_Settings;
 
-        public override string EditorDescription => Resources.PluginOptions_EditorDescription_Basic_Settings;
-
         // 注意：这里刻意不设 Icon。标题是一整句话（36 字），带图标时在手机窄屏换行后
         // 图标会被容器裁掉一半；纯文字按钮会正常换行，桌面端也更清爽。
         public ButtonItem DisclaimerButton { get; set; } = new ButtonItem
@@ -173,6 +171,45 @@ namespace StrmAssistant.Options
             }
 
             root.EditorItems = newItems.ToArray();
+
+            var diagnostics = EditorGroupHelper.MergeGroups(editContainer,
+                Resources.Options_Group_DiagnosticsMaintenance, "DiagnosticsMaintenance",
+                nameof(RuntimeStatus), nameof(ConfigTransfer), nameof(PluginUpdate),
+                nameof(AboutOptions));
+            var reorderedItems = root.EditorItems.ToList();
+            var tasksGroupIndex = reorderedItems.FindIndex(item => IsEditor(item, nameof(ScheduledTasks)));
+            if (diagnostics != null && tasksGroupIndex >= 0)
+                reorderedItems.Insert(tasksGroupIndex + 1, diagnostics);
+            root.EditorItems = reorderedItems.ToArray();
+
+            EditorGroupHelper.MoveButtonToEnd(editContainer, "DiagnosticsMaintenance",
+                nameof(RuntimeStatusOptions.RestartServerButton));
+
+            var finalItems = root.EditorItems.ToList();
+            var finalGroups = finalItems.OfType<EditorGroup>().ToList();
+            var orderedGroupNames = new[]
+            {
+                nameof(TaskConcurrency), nameof(ChineseSearch), nameof(Memory),
+                nameof(ScheduledTasks), "DiagnosticsMaintenance"
+            };
+            var orderedGroups = orderedGroupNames
+                .Select(groupName => finalGroups.FirstOrDefault(group => IsEditor(group, groupName)))
+                .Where(group => group != null)
+                .ToList();
+            var remainingGroups = finalGroups.Except(orderedGroups).ToList();
+            var brandGroup = remainingGroups.FirstOrDefault(group => IsEditor(group, nameof(BrandOptions)));
+            remainingGroups.Remove(brandGroup);
+            var reorderedRoot = finalItems.Where(item => !(item is EditorGroup)).ToList();
+            if (brandGroup != null)
+            {
+                var disclaimerIndex = reorderedRoot.FindIndex(item => IsEditor(item, nameof(DisclaimerButton)));
+                reorderedRoot.Insert(disclaimerIndex >= 0 ? disclaimerIndex + 1 : 0, brandGroup);
+            }
+            root.EditorItems = reorderedRoot
+                .Concat(orderedGroups)
+                .Concat(remainingGroups)
+                .ToArray();
+
             LocalizationHelper.ApplyDescriptions(editContainer, this);
             return container;
         }

@@ -58,15 +58,18 @@ namespace StrmAssistant.Options
         [DisplayNameL("MetadataEnhanceOptions_CommunityRatingMinVotes_Minimum_Votes", typeof(Resources))]
         [DescriptionL("MetadataEnhanceOptions_CommunityRatingMinVotes_Description", typeof(Resources))]
         [Required, MinValue(0), MaxValue(1000000)]
+        [VisibleCondition(nameof(IsTmdbSource), SimpleCondition.IsTrue)]
         public int CommunityRatingMinVotes { get; set; } = 5;
 
         /// <summary>所选来源没有评分时，是否清空原有社区评分（多半来自其它来源）。</summary>
         [DisplayNameL("MetadataEnhanceOptions_CommunityRatingClearWhenMissing_Clear_When_No_Rating", typeof(Resources))]
         [DescriptionL("MetadataEnhanceOptions_CommunityRatingClearWhenMissing_Description", typeof(Resources))]
+        [VisibleCondition(nameof(HasCommunityRatingSource), SimpleCondition.IsTrue)]
         public bool CommunityRatingClearWhenMissing { get; set; } = false;
 
         [DisplayNameL("MetadataEnhanceOptions_UnifyCommunityRatingButton_Unify_Now", typeof(Resources))]
         [DescriptionL("MetadataEnhanceOptions_UnifyCommunityRatingButton_Description", typeof(Resources))]
+        [VisibleCondition(nameof(HasCommunityRatingSource), SimpleCondition.IsTrue)]
         public ButtonItem UnifyCommunityRatingButton =>
             new ButtonItem(Resources.MetadataEnhanceOptions_UnifyCommunityRatingButton_Unify_Now)
             {
@@ -81,6 +84,12 @@ namespace StrmAssistant.Options
             Enum.TryParse<CommunityRatingSourceOption>(CommunityRatingSource, true, out var source)
                 ? source
                 : CommunityRatingSourceOption.None;
+
+        [Browsable(false)]
+        public bool IsTmdbSource => ParsedSource == CommunityRatingSourceOption.Tmdb;
+
+        [Browsable(false)]
+        public bool HasCommunityRatingSource => ParsedSource != CommunityRatingSourceOption.None;
 
         /// <summary>是否由本分组接管 CommunityRating（TMDB / IMDb）；豆瓣由 DoubanAssist 的评分流程接管。</summary>
         [Browsable(false)]

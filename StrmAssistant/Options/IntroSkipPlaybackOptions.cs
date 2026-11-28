@@ -103,9 +103,14 @@ namespace StrmAssistant.Options
                 ConfirmationPrompt = Resources.IntroSkipOptions_ClearIntro_Confirmation
             };
 
+        [VisibleCondition(nameof(HasClearIntroResult), SimpleCondition.IsTrue)]
         public GenericItemList ClearIntroResult { get; set; } = new GenericItemList();
 
+        [VisibleCondition(nameof(HasClearIntroResult), SimpleCondition.IsTrue)]
         public SpacerItem ClearIntroResultSeparator { get; set; } = new SpacerItem(SpacerSize.Small);
+
+        [Browsable(false)]
+        public bool HasClearIntroResult => ClearIntroResult.Count > 0;
 
         public void Initialize(ILibraryManager libraryManager)
         {

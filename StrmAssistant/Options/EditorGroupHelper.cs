@@ -128,6 +128,80 @@ namespace StrmAssistant.Options
             group.EditorItems = group.EditorItems.Except(moved).Concat(moved).ToArray();
         }
 
+        public static EditorGroup MergeGroups(EditObjectContainer container, string title, string name,
+            params string[] sources)
+        {
+            if (container?.EditorRoot?.EditorItems == null) return null;
+
+            var items = container.EditorRoot.EditorItems.ToList();
+            var matched = items.OfType<EditorGroup>()
+                .Where(group => sources.Any(source => NameOrId(group, source)))
+                .ToList();
+            if (matched.Count == 0) return null;
+
+            var mergedItems = matched
+                .SelectMany(group => group.EditorItems ?? Array.Empty<EditorBase>())
+                .ToList();
+            TrimTrailingSpacers(mergedItems);
+            container.EditorRoot.EditorItems = items.Except(matched).ToArray();
+            return new EditorGroup(title, mergedItems.ToArray(), name, container.EditorRoot.Id, null);
+        }
+
+        public static EditorGroup ExtractItemsToGroup(EditObjectContainer container, string fromGroup,
+            string title, string name, params string[] itemNames)
+        {
+            if (container?.EditorRoot?.EditorItems == null || itemNames == null || itemNames.Length == 0) return null;
+
+            var from = container.EditorRoot.EditorItems.OfType<EditorGroup>()
+                .FirstOrDefault(g => NameOrId(g, fromGroup));
+            if (from?.EditorItems == null) return null;
+
+            var moved = from.EditorItems
+                .Where(item => itemNames.Any(name => NameOrId(item, name)))
+                .ToList();
+            if (moved.Count == 0) return null;
+
+            from.EditorItems = from.EditorItems.Except(moved).ToArray();
+            TrimTrailingSpacers(moved);
+            return new EditorGroup(title, moved.ToArray(), name, container.EditorRoot.Id, null);
+        }
+
+        public static void InsertGroupAfter(EditObjectContainer container, string afterGroupName, EditorGroup group)
+        {
+            if (container?.EditorRoot?.EditorItems == null || group == null) return;
+
+            var items = container.EditorRoot.EditorItems.ToList();
+            var after = items.OfType<EditorGroup>().FirstOrDefault(g => NameOrId(g, afterGroupName));
+            if (after == null) return;
+            items.Insert(items.IndexOf(after) + 1, group);
+            container.EditorRoot.EditorItems = items.ToArray();
+        }
+
+        public static void MoveButtonToEnd(EditObjectContainer container, string groupName, string buttonName)
+        {
+            if (container?.EditorRoot?.EditorItems == null) return;
+
+            var group = container.EditorRoot.EditorItems.OfType<EditorGroup>()
+                .FirstOrDefault(g => NameOrId(g, groupName));
+            if (group?.EditorItems == null) return;
+
+            EditorButtonItem button = null;
+            foreach (var buttonGroup in group.EditorItems.OfType<EditorButtonGroup>())
+            {
+                var items = buttonGroup.EditorItems.ToList();
+                button = items.FirstOrDefault(item => NameOrId(item, buttonName));
+                if (button == null) continue;
+                items.Remove(button);
+                buttonGroup.EditorItems = items;
+                break;
+            }
+            if (button == null) return;
+
+            var target = group.EditorItems.OfType<EditorButtonGroup>().LastOrDefault();
+            if (target == null) return;
+            target.EditorItems.Add(button);
+        }
+
         /// <summary>把指定编辑项移动到同一分组内另一项之前。</summary>
         public static void MoveItemBefore(EditObjectContainer container, string groupName, string itemName,
             string beforeItemName)

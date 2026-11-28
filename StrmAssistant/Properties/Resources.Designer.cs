@@ -6033,45 +6033,63 @@ namespace StrmAssistant.Properties {
         /// <summary>
         ///   Looks up a localized string.
         /// </summary>
-        public static string IntroSkipOptions_EditorDescription_Intro_Credits_Detection {
-            get {
-                return ResourceManager.GetString("IntroSkipOptions_EditorDescription_Intro_Credits_Detection", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string.
-        /// </summary>
-        public static string MetadataEnhanceOptions_EditorDescription_Metadata_Enhance {
-            get {
-                return ResourceManager.GetString("MetadataEnhanceOptions_EditorDescription_Metadata_Enhance", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string.
-        /// </summary>
-        public static string NetworkProxyOptions_EditorDescription_Network_Direct_Link {
-            get {
-                return ResourceManager.GetString("NetworkProxyOptions_EditorDescription_Network_Direct_Link", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string.
-        /// </summary>
-        public static string PluginOptions_EditorDescription_Basic_Settings {
-            get {
-                return ResourceManager.GetString("PluginOptions_EditorDescription_Basic_Settings", resourceCulture);
-            }
-        }
-
-        /// <summary>
-        ///   Looks up a localized string.
-        /// </summary>
         public static string ExperienceEnhanceOptions_DryRunPreview {
             get {
                 return ResourceManager.GetString("ExperienceEnhanceOptions_DryRunPreview", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string Options_Group_Advanced {
+            get {
+                return ResourceManager.GetString("Options_Group_Advanced", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string Options_Group_DiagnosticsMaintenance {
+            get {
+                return ResourceManager.GetString("Options_Group_DiagnosticsMaintenance", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string ExperienceEnhanceOptions_Group_Logs {
+            get {
+                return ResourceManager.GetString("ExperienceEnhanceOptions_Group_Logs", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string IntroSkipOptions_Group_IntroCreditsDetection {
+            get {
+                return ResourceManager.GetString("IntroSkipOptions_Group_IntroCreditsDetection", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Description {
+            get {
+                return ResourceManager.GetString("IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Description", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Looks up a localized string.
+        /// </summary>
+        public static string IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Enhanced {
+            get {
+                return ResourceManager.GetString("IntroSkipOptions_UnlockIntroSkip_Intro_Credits_Enhanced", resourceCulture);
             }
         }
 

@@ -64,6 +64,9 @@ namespace StrmAssistant.Core
         
         public Version CurrentVersion => _currentVersion;
         public EmbyApiVersion ApiVersion => _apiVersion;
+
+        public static EmbyApiVersion GetCurrentApiVersion() =>
+            _instance?._apiVersion ?? EmbyApiVersion.Unknown;
         
         /// <summary>
         /// 根据版本号确定API版本

@@ -20,7 +20,8 @@
 
         public virtual string Caption => this.ContentData.EditorTitle;
 
-        public virtual string SubCaption => this.ContentData.EditorDescription;
+        public virtual string SubCaption =>
+            string.IsNullOrEmpty(this.ContentData.EditorDescription) ? null : this.ContentData.EditorDescription;
 
         public string PluginId { get; protected set; }
 
