@@ -8,7 +8,7 @@
 
 - 4.11.0.19 真机：34 enabled patches、Healthy、`Failed=0 / WithErrors=0`；MovieDb、DTO、章节、ISO、截图、中文搜索恢复。
 - 4.10.2.0 同构建：原配置 33 enabled patches、Healthy、`Failed=0 / WithErrors=0`；开启中文搜索为 34，同时开启通知为 35，均 Healthy。
-- 单测 814/814 通过；Release 构建 0 警告 0 错误。
+- 单测 848/848 通过；Release 构建 0 警告 0 错误。
 - 单标题 ISO、DTO 无图人物过滤、ImageCapture 主图/背景图、章节标记恢复均完成内容级验收。
 - 新增修复：补丁错误不再假报 Healthy；多版本合并/拆分逐库查询与重复判定；4.11 UDP 自定义发现响应序列化；STRM 片头检测范围与 MarkerDetector 放行；空元数据语言下的 TVDB 与单集 DTO 空引用防护；4.11 外挂字幕扫描与合集自动建库拦截恢复。
 - 发布前安全收尾：深删路径边界与目录保护、多版本 ID 冲突保护、截图原子替换、核心 API 健康生命周期、操作反馈与 DryRun 通知。
@@ -19,7 +19,7 @@
 - 真实片尾内容验收通过：隔离 4.11 层级库使用《隐秘而伟大》S01E08/E15 真实 1080p H264 STRM，原生 `Detect Credits` 2 分 20 秒完成，分别写入 `CreditsStart=43:07.648` 与 `43:01.056`，均距片尾约 2 分 24 秒；条目 API 返回 `MarkerType=CreditsStart`，FullRefresh 后标记保留。Edge 播放器视觉验收通过，在 `CreditsStart` 处显示“继续观看 / 下一集”覆盖层。
 - 测试 Webhook、临时库、smoke 媒体、STRM 片尾隔离实例、空语言小库、最终字幕/合集验收小库与 Range 服务均已清理；4.10 无效 `simple.dll`、历史 DLL 备份与临时回滚副本已删除。仅余数个被 Windows 句柄锁住的空缓存目录，无数据库、配置或媒体残留。
 - 4.11 适配、STRM 片尾、空引用防护、外挂字幕恢复、合集自动建库拦截，以及本轮安全修复、普通刷新标记保护、真实片尾验收和 TheIntroDB mapping 均已推送到 `main`。未升版本、未打 tag、未发版。
-- 最终候选 DLL SHA-256 `70cf9127d76fb6274f72d2a67305d1d7330de4c8ee3dba35a71481755b9a274b` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
+- 最终候选 DLL SHA-256 `d5ef26482215981e2154c139de0db6decf607a2620d8e06b961cf8292ead22a7` 已部署到两套测试实例；4.10/4.11 最终回归均 Healthy、Failed/WithErrors 为 0，搜索、DTO、章节刷新保护与合集拦截通过。
 - 本地详细交接：`docs/handoff.md`；实测方案：`docs/architecture/emby-4.11-adaptation-plan-verified.md`（`docs/` 不入库）。
 
 ## ✅ TheIntroDB v4 mapping 集序转换已完成（2026-11-27）
@@ -28,7 +28,7 @@
 - 4.11 优先读取 `Series.SeriesOrder`（`fileorder` ProviderId，如 `Tvdb-2_dvd`），旧版本回退 `Series.DisplayOrder`。
 - 已有 `tvdb_episode_id` 精确锁定的单集不传 mapping；TMDB/IMDb 路径保持原行为。
 - 服务端返回 400 时去掉 mapping 重试一次，仍失败则按原失败分类处理。
-- 新增 29 项 mapping 测试，全量 **814/814** 通过；最终候选 DLL SHA-256 `70cf9127d76fb6274f72d2a67305d1d7330de4c8ee3dba35a71481755b9a274b`。
+- 新增 29 项 mapping 测试，全量 **848/848** 通过；最终候选 DLL SHA-256 `d5ef26482215981e2154c139de0db6decf607a2620d8e06b961cf8292ead22a7`。
 - 隔离 4.11 库内容级对照通过：《三国演义》absolute 与 official 均写入 03:00；《笑傲江湖》DVD 返回 400 并回退 official，均写入 01:30。mapping 轮 6 次请求、无 mapping 基线 4 次请求，两轮 8 条 `#DB` 标记摘要完全一致。
 - 4.10 候选启动 `Healthy`，验证旧 `DisplayOrder` 回退路径；最终候选已部署到两套实例并恢复原刮削范围。
 - 本地 248 部 TVDB 剧中 51 部有提交，但无一部同时具备可用 DVD/absolute 集序；改用 TheIntroDB 覆盖率与 TVDB 集序代理反向筛选，找到真实样本 **The Office US（TVDB 73244）S04E09**。自建虚拟库端到端验收：DVD 只写 `CreditsStart=21:39.817`；official 写 `IntroStart=02:35.004`、`IntroEnd=03:04.004`、`CreditsStart=21:30.864`，证明 mapping 会改变实际落库内容。
@@ -42,7 +42,17 @@
 - P2：IntroDB 缓存限制 512 条并回收过期项；补丁健康状态同步功能开关；章节序列化纳入后台任务跟踪；代理状态重开页面保留；HDR 子开关随总开关启用。
 - 设置页搜索兼容 `genericui` 路由，使用可迭代的 `Map` 保存并恢复原始 `style.display`，限定插件配置页；补充三语页面失效提示、搜索文案、演练文本和繁体用词修正。
 - 实机验收：P0 删除鉴权、回滚与库外 STRM 目标边界通过；禁用态启动与 FTS Restore 通过；损坏 schema 保留且 Healthy；两个隔离条目批量重提取、产物落盘与标记清理通过；STRM 直链 302、30 秒缓存和失败回退通过。Edge 设置页验证搜索清空后完整恢复、代理状态重开保留、HDR 子开关条件禁用和保存回显。300 条目字幕扫描在处理第 3 个条目时取消，日志出现 `ExternalSubtitle - Item cancelled`，后续条目未写入新字幕，取消传播通过。
-- 最终 **814/814** 测试通过，Release 构建 0 警告 0 错误；候选 DLL SHA-256 `70cf9127d76fb6274f72d2a67305d1d7330de4c8ee3dba35a71481755b9a274b` 已部署两套实例并 `Healthy`、`issues=0`。ARM64 NAS 按计划推迟。
+- 最终 **848/848** 测试通过，Release 构建 0 警告 0 错误；候选 DLL SHA-256 `d5ef26482215981e2154c139de0db6decf607a2620d8e06b961cf8292ead22a7` 已部署两套实例并 `Healthy`、`issues=0`。ARM64 NAS 按计划推迟。
+
+### 2026-11-28 服务端审计修复
+
+- 删除：附属文件改为已知语言/元数据标记白名单；主文件与深删目标均解析目录联接真实目标；接口返回 `Deleted / DryRun / Denied / RolledBack`，前端不再把无操作当成功。
+- 识别：DV 几何标注仅用于恰好两条视频流的 MPEG-TS，保留已有 DOVI 标签；MPLS 全部无效时拒绝任意流回退；电影刮削应用媒体库范围。
+- 持久化与任务：JSON 同条目原子写并按 `SourceItemId` 恢复多个源；全局清除覆盖所有标记来源，非法 `#DB` 不再复活；批量任务取消后排空 worker，强制重提取标记仅成功后清除。
+- HTTP 与配置：Range 校验 `Content-Range`、`Content-Length` 和完整正文；视频/LiveTV 必需请求头回退中转；签名 URL 保留原始 query；配置成功落盘后再应用运行时副作用。
+- 小项：单集刷新按所选元数据/图片范围分别替换；forced/SDH 可独立修正；元数据内存缓存按 6 小时过期。
+- 实机证据：隔离库 DryRun 返回 `DryRun` 且文件不变；实际删除只移除本版本 MKV/NFO/SRT，其他版本附属文件保留；双源 JSON 恢复到两个条目；签名 302 保留 `+` 与 `%2B`；两套实例 Health/HookSelfTest 均无启用模块错误。
+- 外部播放器与硬件方案（CoreELEC、魔改 VLC、CineFuze、CB1 FEL、晶晨注入）不纳入本仓修复范围；ARM64 NAS 仍待正式部署后验收。
 
 ## ✅ 4.0.1.2 片头片尾清除与电影补缺已发布（2026-11-20）
 
